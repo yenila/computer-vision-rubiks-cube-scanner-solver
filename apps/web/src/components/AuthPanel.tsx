@@ -2,7 +2,7 @@ import { Database, LogIn, LogOut, RotateCcw, UserPlus } from "lucide-react";
 import { useState } from "react";
 import type { ApiSession } from "../lib/api";
 import { api } from "../lib/api";
-import { isDemoMode } from "../lib/appMode";
+import { isDemoMode, isSupabaseMode } from "../lib/appMode";
 import { Button } from "./Button";
 
 export function AuthPanel({
@@ -20,13 +20,16 @@ export function AuthPanel({
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const submit = async () => {
     setLoading(true);
     setError(null);
+    setNotice(null);
     try {
       const next = mode === "login" ? await api.login({ email, password }) : await api.register({ email, password, name });
-      onSession(next);
+      if (next) onSession(next);
+      else setNotice("Account created. Check your email to confirm it, then sign in.");
     } catch (authError) {
       setError(authError instanceof Error ? authError.message : "Authentication failed.");
     } finally {
@@ -68,9 +71,22 @@ export function AuthPanel({
           <div className="text-sm font-semibold text-ink">{session.user.name}</div>
           <div className="text-sm text-slate-600">{session.user.email}</div>
         </div>
-        <Button icon={<LogOut size={16} />} onClick={() => onSession(null)}>
+        {isSupabaseMode ? <div className="text-xs font-medium text-emerald-700">Authenticated by Supabase</div> : null}
+        <Button
+          icon={<LogOut size={16} />}
+          onClick={async () => {
+            setError(null);
+            try {
+              await api.logout();
+              onSession(null);
+            } catch (logoutError) {
+              setError(logoutError instanceof Error ? logoutError.message : "Sign out failed.");
+            }
+          }}
+        >
           Sign out
         </Button>
+        {error ? <div className="text-sm text-red-700">{error}</div> : null}
       </div>
     );
   }
@@ -89,6 +105,7 @@ export function AuthPanel({
         placeholder="Password"
       />
       {error ? <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div> : null}
+      {notice ? <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{notice}</div> : null}
       <div className="flex gap-2">
         <Button icon={mode === "login" ? <LogIn size={16} /> : <UserPlus size={16} />} variant="primary" onClick={submit} disabled={loading}>
           {loading ? "Working" : mode === "login" ? "Sign in" : "Create account"}

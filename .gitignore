@@ -9,5 +9,6 @@ coverage
 .DS_Store
 apps/api/prisma/dev.db
 apps/api/generated
+supabase/.temp/
 
 .vercel

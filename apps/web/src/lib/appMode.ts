@@ -1,12 +1,14 @@
-export type AppMode = "demo" | "fullstack";
+export type AppMode = "demo" | "fullstack" | "supabase";
 
 const configuredMode = import.meta.env.VITE_APP_MODE?.toLowerCase();
 
 export const appMode: AppMode =
-  configuredMode === "fullstack" || configuredMode === "demo"
+  configuredMode === "fullstack" || configuredMode === "demo" || configuredMode === "supabase"
     ? configuredMode
     : import.meta.env.DEV
       ? "fullstack"
-      : "demo";
+      : "supabase";
 
 export const isDemoMode = appMode === "demo";
+export const isSupabaseMode = appMode === "supabase";
+export const usesBrowserSolver = isDemoMode || isSupabaseMode;

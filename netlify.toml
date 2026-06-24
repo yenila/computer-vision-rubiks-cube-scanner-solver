@@ -4,7 +4,7 @@
 
 [build.environment]
   NODE_VERSION = "20.18.0"
-  VITE_APP_MODE = "demo"
+  VITE_APP_MODE = "supabase"
 
 [[redirects]]
   from = "/*"

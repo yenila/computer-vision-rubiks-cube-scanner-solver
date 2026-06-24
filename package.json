@@ -20,6 +20,7 @@
     "test:shared": "vitest run --root packages/shared",
     "test:web": "vitest run --root apps/web --environment jsdom",
     "test:api": "vitest run --root apps/api",
+    "verify:supabase": "node scripts/verify-supabase.mjs",
     "lint": "npm-run-all lint:*",
     "lint:web": "eslint apps/web",
     "lint:api": "eslint apps/api",

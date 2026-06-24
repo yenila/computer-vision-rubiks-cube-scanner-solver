@@ -1,13 +1,14 @@
 # Computer Vision Rubik’s Cube Scanner and Solver
 
-A full-stack Rubik's Cube scanner web app with camera-guided scanning, OpenCV-assisted sticker detection, color classification, cube-state validation, cubejs solving, metallic React Three Fiber visualization, JWT authentication, saved scan history, personal stats, and a global leaderboard.
+A full-stack Rubik's Cube scanner with camera-guided scanning, OpenCV-assisted sticker detection, browser-side solving, a React Three Fiber visualization, Supabase Auth, cloud scan history, and a global leaderboard. The original Express, Prisma, PostgreSQL, and JWT backend remains available for local development.
 
 ## Architecture
 
 This repository is an npm-workspaces monorepo:
 
-- `apps/web`: React 19, TypeScript, Vite, Tailwind CSS, React Three Fiber, OpenCV.js loader, camera workflow, manual correction, solver controls, auth, history, leaderboard, and responsive UI.
-- `apps/api`: Node.js, Express, TypeScript, Prisma, PostgreSQL, JWT auth, route validation, service/repository layers, and centralized error handling.
+- `apps/web`: React 19, TypeScript, Vite, Tailwind CSS, React Three Fiber, OpenCV.js, a Web Worker solver, Supabase Auth/data access, manual correction, history, leaderboard, and responsive UI.
+- `supabase`: PostgreSQL migrations, triggers, constraints, and Row Level Security policies for the hosted public app.
+- `apps/api`: the retained local/optional Node.js, Express, Prisma, PostgreSQL, and JWT backend.
 - `packages/shared`: cube domain model, color classification, facelet validation, solver notation helpers, and shared DTO types used by both frontend and backend.
 
 The shared package keeps cube rules outside the UI and API framework code. The backend follows clean architecture boundaries: routes call services, services call repositories, and infrastructure details stay behind Prisma and middleware adapters.
@@ -16,9 +17,36 @@ The shared package keeps cube rules outside the UI and API framework code. The b
 
 - Node.js 20.18+
 - npm 10+
-- Docker Desktop for local PostgreSQL, or your own PostgreSQL instance
+- A Supabase project for Supabase Mode
+- Docker Desktop only when using the legacy local Express/PostgreSQL mode
 
-## Setup
+## Local setup — Supabase Mode
+
+```bash
+npm install
+cp .env.example .env
+```
+
+Set these values in `.env`:
+
+```bash
+VITE_APP_MODE="supabase"
+VITE_SUPABASE_URL="https://<project-ref>.supabase.co"
+VITE_SUPABASE_ANON_KEY="<anon-or-publishable-key>"
+```
+
+Apply [the Supabase migration](supabase/migrations/20260624000000_initial_schema.sql) through the Supabase SQL Editor, or with the CLI:
+
+```bash
+npx supabase@latest login
+npx supabase@latest link --project-ref <project-ref>
+npx supabase@latest db push
+npm run dev:web
+```
+
+Web: `http://localhost:5173`
+
+## Local setup — retained Express/Prisma Mode
 
 ```bash
 npm install
@@ -47,42 +75,56 @@ PORT="4000"
 VITE_API_URL="http://localhost:4000/api"
 VITE_OPENCV_URL="https://docs.opencv.org/4.x/opencv.js"
 VITE_APP_MODE="fullstack"
+VITE_SUPABASE_URL="https://your-project-ref.supabase.co"
+VITE_SUPABASE_ANON_KEY="your-anon-or-publishable-key"
 ```
 
-For production, use a strong `JWT_SECRET`, HTTPS, managed PostgreSQL, a pinned OpenCV.js asset, and a restricted `CORS_ORIGIN`.
+Only the Supabase URL and anon/publishable key belong in the frontend. Never expose the Supabase service-role key in a `VITE_` variable.
 
-## Portfolio deployment — frontend only
+## Public deployment — Supabase + Vercel
 
-Demo Mode turns the project into a static portfolio application. It needs no API host, database host, Prisma migration, payment method, or server secrets.
+The public build uses Supabase Auth and Supabase PostgreSQL directly from the browser. Row Level Security protects user-owned scans and solve history. Cube solving runs in a Web Worker, so no Render API is required.
 
-The static demo retains the recruiter-facing workflow:
+### Supabase setup
 
-- Live camera capture, OpenCV-assisted detection, and manual sticker correction.
-- One-click sample scrambled cube for testing without a physical cube.
-- Verified `cubejs` solving inside a Web Worker so the interface remains responsive.
-- Interactive 3D cube and guided move playback.
-- Browser-local scan history, solve history, and a demo leaderboard using `localStorage`.
-- An explicit “Portfolio demo” label so local data is not presented as a hosted account.
+1. Create a Supabase project.
+2. Apply `supabase/migrations/20260624000000_initial_schema.sql`.
+3. In Authentication → URL Configuration, set the Site URL to the production Vercel URL and add `http://localhost:5173` as a redirect URL.
+4. Copy the Project URL and anon/publishable key from the project API settings.
 
-Production builds default to Demo Mode when `VITE_APP_MODE` is not set. Set it explicitly on a static host for clarity:
+The migration creates four public tables:
 
-```bash
-VITE_APP_MODE="demo"
-```
+- `profiles`: public display names linked to `auth.users`.
+- `cube_scans`: each user's scanned cube JSON and optional solution.
+- `solve_history`: each user's solutions and durations.
+- `leaderboard_entries`: trigger-maintained best time and solve count.
 
 ### Vercel
 
-Import the repository with the repository root selected. The included `vercel.json` uses:
+Import the repository with its root selected. The included `vercel.json` uses:
 
 - Build command: `npm run build:web`
 - Output directory: `apps/web/dist`
-- Environment variable: `VITE_APP_MODE=demo`
+
+Add these Production and Preview environment variables:
+
+```bash
+VITE_APP_MODE="supabase"
+VITE_SUPABASE_URL="https://<project-ref>.supabase.co"
+VITE_SUPABASE_ANON_KEY="<anon-or-publishable-key>"
+```
 
 ### Netlify
 
-Import the repository normally. The included `netlify.toml` already defines the build command, publish directory, Node version, Demo Mode, and SPA fallback.
+The included `netlify.toml` defines the build, publish directory, Supabase Mode, and SPA fallback. Add the same Supabase URL and key in Netlify's environment settings.
 
-## Optional full-stack production deployment
+## Runtime modes
+
+- `supabase`: hosted Auth/PostgreSQL plus the browser Worker solver; the production default.
+- `fullstack`: retained Express/Prisma/JWT API for local or separately hosted environments.
+- `demo`: frontend-only browser storage with no hosted data, retained as a fallback portfolio mode.
+
+## Optional legacy Express production deployment
 
 The repository includes `render.yaml` for the API and `vercel.json` for the frontend.
 

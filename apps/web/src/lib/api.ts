@@ -1,5 +1,5 @@
 import type { AuthUser, CubeScanState, SolveResult } from "@rubiks/shared";
-import { isDemoMode } from "./appMode";
+import { isDemoMode, isSupabaseMode } from "./appMode";
 import {
   createDemoScan,
   createDemoSolve,
@@ -10,6 +10,7 @@ import {
   resetDemoData
 } from "./demoData";
 import { solveInBrowser } from "./demoSolver";
+import { supabaseApi } from "./supabaseService";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000/api";
 const REQUEST_TIMEOUT_MS = import.meta.env.PROD ? 45000 : 10000;
@@ -41,6 +42,21 @@ export type LeaderboardEntry = {
   name: string;
   bestTimeMs: number;
   solves: number;
+};
+
+export type AppService = {
+  register: (input: { email: string; password: string; name: string }) => Promise<ApiSession | null>;
+  login: (input: { email: string; password: string }) => Promise<ApiSession | null>;
+  solve: (facelets: string) => Promise<SolveResult>;
+  listScans: (token: string) => Promise<ScanRecord[]>;
+  createScan: (token: string, input: { name: string; scan: CubeScanState; solution?: SolveResult }) => Promise<ScanRecord>;
+  listSolves: (token: string) => Promise<SolveRecord[]>;
+  createSolve: (token: string, input: { scanId?: string; solution: SolveResult; durationMs: number }) => Promise<SolveRecord>;
+  leaderboard: () => Promise<LeaderboardEntry[]>;
+  getSession: () => Promise<ApiSession | null>;
+  onSessionChange: (callback: (session: ApiSession | null) => void) => () => void;
+  logout: () => Promise<void>;
+  resetDemoData: () => Promise<void>;
 };
 
 async function request<T>(path: string, options: RequestInit = {}, token?: string): Promise<T> {
@@ -75,7 +91,7 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
   return payload as T;
 }
 
-const remoteApi = {
+const remoteApi: AppService = {
   register: (input: { email: string; password: string; name: string }) =>
     request<ApiSession>("/auth/register", { method: "POST", body: JSON.stringify(input) }),
   login: (input: { email: string; password: string }) =>
@@ -88,10 +104,20 @@ const remoteApi = {
   createSolve: (token: string, input: { scanId?: string; solution: SolveResult; durationMs: number }) =>
     request<SolveRecord>("/solves", { method: "POST", body: JSON.stringify(input) }, token),
   leaderboard: () => request<LeaderboardEntry[]>("/leaderboard"),
+  getSession: async () => {
+    try {
+      const value = localStorage.getItem("rubiks-session");
+      return value ? (JSON.parse(value) as ApiSession) : null;
+    } catch {
+      return null;
+    }
+  },
+  onSessionChange: () => () => undefined,
+  logout: async () => undefined,
   resetDemoData: async (): Promise<void> => undefined
 };
 
-const demoApi: typeof remoteApi = {
+const demoApi: AppService = {
   register: async () => demoSession,
   login: async () => demoSession,
   solve: solveInBrowser,
@@ -100,7 +126,10 @@ const demoApi: typeof remoteApi = {
   listSolves: async () => listDemoSolves(),
   createSolve: async (_token, input) => createDemoSolve(input),
   leaderboard: async () => listDemoLeaderboard(),
+  getSession: async () => demoSession,
+  onSessionChange: () => () => undefined,
+  logout: async () => undefined,
   resetDemoData: async () => resetDemoData()
 };
 
-export const api = isDemoMode ? demoApi : remoteApi;
+export const api: AppService = isSupabaseMode ? supabaseApi : isDemoMode ? demoApi : remoteApi;

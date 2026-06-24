@@ -1,4 +1,4 @@
-import { CloudOff, Save, ShieldCheck, Sparkles } from "lucide-react";
+import { CloudOff, Database, Save, ShieldCheck, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   createEmptyScanState,
@@ -12,7 +12,7 @@ import {
   type SolveResult
 } from "@rubiks/shared";
 import { api, type ApiSession } from "./lib/api";
-import { isDemoMode } from "./lib/appMode";
+import { appMode, isDemoMode, isSupabaseMode, usesBrowserSolver } from "./lib/appMode";
 import { createSampleScan, demoSession } from "./lib/demoData";
 import { AuthPanel } from "./components/AuthPanel";
 import { Button } from "./components/Button";
@@ -31,6 +31,7 @@ export function App() {
   const [activeFace, setActiveFace] = useState<CubeFace>("F");
   const [session, setSession] = useState<ApiSession | null>(() => {
     if (isDemoMode) return demoSession;
+    if (isSupabaseMode) return null;
     const raw = localStorage.getItem("rubiks-session");
     try {
       return raw ? (JSON.parse(raw) as ApiSession) : null;
@@ -58,10 +59,34 @@ export function App() {
   const statusColor = !validation.valid ? "text-slate-400" : solveStatus === "not_solvable" ? "text-amber-700" : "text-teal-700";
 
   useEffect(() => {
-    if (isDemoMode) return;
+    if (appMode !== "fullstack") return;
     if (session) localStorage.setItem("rubiks-session", JSON.stringify(session));
     else localStorage.removeItem("rubiks-session");
   }, [session]);
+
+  useEffect(() => {
+    if (!isSupabaseMode) return;
+    let active = true;
+    api.getSession()
+      .then((nextSession) => {
+        if (active) setSession(nextSession);
+      })
+      .catch((error) => {
+        if (active) setMessage(error instanceof Error ? error.message : "Supabase session could not be restored.");
+      });
+    let unsubscribe: () => void = () => undefined;
+    try {
+      unsubscribe = api.onSessionChange((nextSession) => {
+        if (active) setSession(nextSession);
+      });
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Supabase authentication could not start.");
+    }
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, []);
 
   const updateFaceScan = (faceScan: FaceScan) => {
     setScan((current) => ({ ...current, [faceScan.face]: faceScan }));
@@ -109,7 +134,7 @@ export function App() {
       const saved = await api.createScan(session.token, { name: `Scan ${new Date().toLocaleString()}`, scan, solution: solution ?? undefined });
       if (solution) await api.createSolve(session.token, { scanId: saved.id, solution, durationMs: Math.max(1000, solution.moves.length * 850) });
       setDataRevision((current) => current + 1);
-      setMessage(isDemoMode ? "Saved in this browser." : "Scan saved.");
+      setMessage(isDemoMode ? "Saved in this browser." : isSupabaseMode ? "Saved to Supabase." : "Scan saved.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Save failed.");
     }
@@ -129,6 +154,11 @@ export function App() {
                 <CloudOff size={17} />
                 Portfolio demo · runs in your browser
               </div>
+            ) : isSupabaseMode ? (
+              <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
+                <Database size={17} />
+                Supabase cloud · browser solver
+              </div>
             ) : null}
             <div className="flex items-center gap-2 rounded-md border border-line bg-slate-50 px-3 py-2 text-sm">
               <ShieldCheck size={17} className={statusColor} />
@@ -147,7 +177,7 @@ export function App() {
             title="Validation and solving"
             actions={
               <div className="flex flex-wrap gap-2">
-                {isDemoMode ? (
+                {usesBrowserSolver ? (
                   <Button
                     icon={<Sparkles size={16} />}
                     onClick={() => {
@@ -164,7 +194,7 @@ export function App() {
                   </Button>
                 ) : null}
                 <Button icon={<Save size={16} />} onClick={saveScan}>
-                  {isDemoMode ? "Save locally" : "Save"}
+                  {isDemoMode ? "Save locally" : isSupabaseMode ? "Save to cloud" : "Save"}
                 </Button>
                 <Button variant="primary" onClick={solve} disabled={!validation.valid || isSolving}>
                   {isSolving ? "Generating" : "Generate solution"}
@@ -209,7 +239,7 @@ export function App() {
         </div>
 
         <aside className="space-y-4">
-          <Panel title={isDemoMode ? "Demo session" : "Account"}>
+          <Panel title={isDemoMode ? "Demo session" : isSupabaseMode ? "Supabase account" : "Account"}>
             <AuthPanel
               session={session}
               onSession={setSession}
