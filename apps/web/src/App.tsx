@@ -1,4 +1,4 @@
-import { Save, ShieldCheck } from "lucide-react";
+import { LogIn, Save, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   createEmptyScanState,
@@ -21,6 +21,7 @@ import { Leaderboard } from "./components/Leaderboard";
 import { MoveControls } from "./components/MoveControls";
 import { Panel } from "./components/Panel";
 import { ScanReview } from "./components/ScanReview";
+import { WelcomeScreen } from "./components/WelcomeScreen";
 
 type SolveStatus = "unchecked" | "solvable" | "not_solvable";
 
@@ -29,8 +30,15 @@ export function App() {
   const [activeFace, setActiveFace] = useState<CubeFace>("F");
   const [session, setSession] = useState<ApiSession | null>(() => {
     const raw = localStorage.getItem("rubiks-session");
-    return raw ? (JSON.parse(raw) as ApiSession) : null;
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw) as ApiSession;
+    } catch {
+      localStorage.removeItem("rubiks-session");
+      return null;
+    }
   });
+  const [hasEnteredApp, setHasEnteredApp] = useState(() => Boolean(session));
   const [solution, setSolution] = useState<SolveResult | null>(null);
   const [moveHistory, setMoveHistory] = useState<MoveToken[]>([]);
   const [activeMove, setActiveMove] = useState<MoveToken | null>(null);
@@ -105,6 +113,23 @@ export function App() {
     }
   };
 
+  const handleSession = (nextSession: ApiSession | null) => {
+    setSession(nextSession);
+    setHasEnteredApp(Boolean(nextSession));
+  };
+
+  if (!hasEnteredApp) {
+    return (
+      <WelcomeScreen
+        onSession={(nextSession) => handleSession(nextSession)}
+        onContinueAsGuest={() => {
+          setSession(null);
+          setHasEnteredApp(true);
+        }}
+      />
+    );
+  }
+
   return (
     <main className="min-h-screen bg-[#eef2f6]">
       <header className="border-b border-line bg-white">
@@ -175,8 +200,17 @@ export function App() {
         </div>
 
         <aside className="space-y-4">
-          <Panel title="Account">
-            <AuthPanel session={session} onSession={setSession} />
+          <Panel title={session ? "Account" : "Guest session"}>
+            {session ? (
+              <AuthPanel session={session} onSession={handleSession} />
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm leading-6 text-slate-600">You can scan and solve as a guest. Sign in to save scans and view your solve history.</p>
+                <Button icon={<LogIn size={16} />} onClick={() => setHasEnteredApp(false)}>
+                  Sign in or register
+                </Button>
+              </div>
+            )}
           </Panel>
           <Panel title="History">
             <HistoryPanel session={session} />
