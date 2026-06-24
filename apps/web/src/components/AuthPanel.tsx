@@ -27,10 +27,15 @@ export function AuthPanel({ session, onSession }: { session: ApiSession | null; 
 
   if (session) {
     return (
-      <div className="space-y-3">
-        <div>
-          <div className="text-sm font-semibold text-ink">{session.user.name}</div>
-          <div className="text-sm text-slate-600">{session.user.email}</div>
+      <div className="space-y-4">
+        <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-300 to-violet-500 text-sm font-black text-slate-950">
+            {session.user.name.slice(0, 2).toUpperCase()}
+          </div>
+          <div className="min-w-0">
+            <div className="truncate text-sm font-semibold text-white">{session.user.name}</div>
+            <div className="truncate text-xs text-slate-400">{session.user.email}</div>
+          </div>
         </div>
         <Button icon={<LogOut size={16} />} onClick={() => onSession(null)}>
           Sign out
@@ -40,27 +45,35 @@ export function AuthPanel({ session, onSession }: { session: ApiSession | null; 
   }
 
   return (
-    <div className="space-y-3">
+    <form
+      className="space-y-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void submit();
+      }}
+    >
       {mode === "register" ? (
-        <input className="h-10 w-full rounded-md border border-line px-3 text-sm" value={name} onChange={(event) => setName(event.target.value)} placeholder="Name" />
+        <input aria-label="Name" autoComplete="name" className="h-11 w-full rounded-xl border border-white/10 bg-slate-950/60 px-3 text-sm text-white outline-none placeholder:text-slate-600 focus:border-cyan-300/50 focus:ring-2 focus:ring-cyan-300/10" value={name} onChange={(event) => setName(event.target.value)} placeholder="Name" />
       ) : null}
-      <input className="h-10 w-full rounded-md border border-line px-3 text-sm" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email" />
+      <input aria-label="Email" autoComplete="email" className="h-11 w-full rounded-xl border border-white/10 bg-slate-950/60 px-3 text-sm text-white outline-none placeholder:text-slate-600 focus:border-cyan-300/50 focus:ring-2 focus:ring-cyan-300/10" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email" />
       <input
-        className="h-10 w-full rounded-md border border-line px-3 text-sm"
+        aria-label="Password"
+        autoComplete={mode === "login" ? "current-password" : "new-password"}
+        className="h-11 w-full rounded-xl border border-white/10 bg-slate-950/60 px-3 text-sm text-white outline-none placeholder:text-slate-600 focus:border-cyan-300/50 focus:ring-2 focus:ring-cyan-300/10"
         type="password"
         value={password}
         onChange={(event) => setPassword(event.target.value)}
         placeholder="Password"
       />
-      {error ? <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div> : null}
+      {error ? <div className="rounded-xl border border-red-400/20 bg-red-500/10 px-3 py-2 text-sm text-red-200">{error}</div> : null}
       <div className="flex gap-2">
-        <Button icon={mode === "login" ? <LogIn size={16} /> : <UserPlus size={16} />} variant="primary" onClick={submit} disabled={loading}>
+        <Button className="flex-1" icon={mode === "login" ? <LogIn size={16} /> : <UserPlus size={16} />} variant="primary" type="submit" disabled={loading}>
           {loading ? "Working" : mode === "login" ? "Sign in" : "Create account"}
         </Button>
         <Button variant="ghost" onClick={() => setMode(mode === "login" ? "register" : "login")}>
           {mode === "login" ? "Register" : "Use login"}
         </Button>
       </div>
-    </div>
+    </form>
   );
 }

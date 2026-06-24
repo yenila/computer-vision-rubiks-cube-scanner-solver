@@ -1,19 +1,19 @@
-import { Camera, CheckCircle2, RotateCw, ScanLine, ShieldCheck, VideoOff } from "lucide-react";
+import { Camera, CheckCircle2, CircleAlert, RotateCw, ScanLine, ShieldCheck, VideoOff } from "lucide-react";
+import { useState } from "react";
 import type { CubeColor, CubeFace, CubeScanState, FaceScan } from "@rubiks/shared";
 import { useCamera } from "../hooks/useCamera";
 import { detectFace } from "../lib/opencvDetector";
 import { buildCalibratedPalette, GUIDED_SCAN_STEPS, getGuidedScanStep } from "../lib/scanGuide";
 import { Button } from "./Button";
 import { FaceGridEditor } from "./FaceGridEditor";
-import { useState } from "react";
 
 const colorClass: Record<CubeColor, string> = {
-  white: "bg-white",
-  red: "bg-red-600",
-  green: "bg-green-600",
-  yellow: "bg-yellow-400",
-  orange: "bg-orange-500",
-  blue: "bg-blue-600"
+  white: "bg-white shadow-[0_0_14px_rgba(255,255,255,.35)]",
+  red: "bg-red-500 shadow-[0_0_14px_rgba(239,68,68,.35)]",
+  green: "bg-emerald-400 shadow-[0_0_14px_rgba(52,211,153,.35)]",
+  yellow: "bg-yellow-300 shadow-[0_0_14px_rgba(253,224,71,.35)]",
+  orange: "bg-orange-400 shadow-[0_0_14px_rgba(251,146,60,.35)]",
+  blue: "bg-blue-500 shadow-[0_0_14px_rgba(59,130,246,.35)]"
 };
 
 export function CameraScanner({
@@ -35,21 +35,21 @@ export function CameraScanner({
   const activeStepIndex = GUIDED_SCAN_STEPS.findIndex((step) => step.face === activeFace);
   const completedCount = GUIDED_SCAN_STEPS.filter((step) => Boolean(scan[step.face])).length;
   const cameraOrientationLabel = camera.facingMode === "environment"
-    ? "Rear camera - not mirrored"
+    ? "Rear camera · unmirrored"
     : camera.facingMode === "user"
-      ? "Front camera - capture not mirrored"
-      : "Camera capture - not mirrored";
+      ? "Front camera · unmirrored"
+      : "Camera capture · unmirrored";
 
   const acceptFace = (faceScan: FaceScan) => {
-      onFaceScan(faceScan);
-      setPendingScan(null);
-      const nextStep = GUIDED_SCAN_STEPS[activeStepIndex + 1];
-      if (nextStep) {
-        setStatus(`${activeStep.title} captured. Next: ${nextStep.instruction}`);
-        onActiveFace(nextStep.face);
-      } else {
-        setStatus("All six faces are captured. Review the cube net below before generating the solution.");
-      }
+    onFaceScan(faceScan);
+    setPendingScan(null);
+    const nextStep = GUIDED_SCAN_STEPS[activeStepIndex + 1];
+    if (nextStep) {
+      setStatus(`${activeStep.title} captured. Next: ${nextStep.instruction}`);
+      onActiveFace(nextStep.face);
+    } else {
+      setStatus("All six faces are captured. Review the cube net below before generating the solution.");
+    }
   };
 
   const capture = async () => {
@@ -66,7 +66,6 @@ export function CameraScanner({
         setStatus(`The camera reads ${result.debug.detectedCenter}, but this step expects ${activeStep.centerColor}. If the physical center is ${activeStep.centerColor}, confirm it below.`);
         return;
       }
-
       acceptFace(result.faceScan);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Detection failed.");
@@ -76,78 +75,101 @@ export function CameraScanner({
   };
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[1.35fr_.65fr]">
-      <div className="space-y-3">
-        <div className="rounded-lg border border-teal-200 bg-teal-50 p-3">
-          <div className="flex items-start gap-3">
-            <div className={`mt-0.5 h-9 w-9 shrink-0 rounded-md border-2 border-white shadow-sm ${colorClass[activeStep.centerColor]}`} />
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="text-sm font-black text-teal-950">Step {activeStepIndex + 1} of {GUIDED_SCAN_STEPS.length}: {activeStep.title}</div>
-                <div className="text-xs font-semibold text-teal-800">{completedCount}/{GUIDED_SCAN_STEPS.length} captured</div>
-              </div>
-              <p className="mt-1 text-sm text-teal-950">{activeStep.instruction}</p>
-              <div className="mt-2 flex items-center gap-1.5 text-xs text-teal-800">
-                <RotateCw size={14} aria-hidden="true" />
-                {activeStep.orientationHint}
+    <div className="space-y-5">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="space-y-4">
+          <div className="relative overflow-hidden rounded-2xl border border-cyan-300/20 bg-gradient-to-r from-cyan-400/[0.08] via-slate-950/60 to-violet-500/[0.07] p-4">
+            <div className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-cyan-300 to-violet-500" />
+            <div className="flex items-start gap-4">
+              <div className={`mt-0.5 h-11 w-11 shrink-0 rounded-xl border-4 border-slate-900 ${colorClass[activeStep.centerColor]}`} />
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-sm font-black text-white">Step {activeStepIndex + 1} / {GUIDED_SCAN_STEPS.length} · {activeStep.title}</div>
+                  <div className="rounded-full border border-emerald-300/20 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-300">{completedCount} captured</div>
+                </div>
+                <p className="mt-1.5 text-sm leading-6 text-slate-300">{activeStep.instruction}</p>
+                <div className="mt-2 flex items-center gap-1.5 text-xs text-cyan-200/80"><RotateCw size={14} />{activeStep.orientationHint}</div>
               </div>
             </div>
           </div>
-        </div>
-        <div className="relative overflow-hidden rounded-lg border border-line bg-slate-950">
-          <video ref={camera.videoRef} className="aspect-video w-full object-contain" style={{ transform: "scaleX(1)" }} muted playsInline />
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <div className="camera-mask relative grid aspect-square h-[62%] grid-cols-3 grid-rows-3 gap-0.5 rounded-md border">
-              <div className="absolute -top-8 left-1/2 flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded bg-slate-950/85 px-2 py-1 text-[11px] font-black uppercase text-white">
-                <span className={`h-3 w-3 rounded-full border border-white/70 ${colorClass[activeStep.topEdgeColor]}`} />
-                {activeStep.topEdgeColor} edge on top
+
+          <div className="group relative overflow-hidden rounded-2xl border border-white/10 bg-[#02050a] shadow-[0_0_60px_rgba(34,211,238,.06)]">
+            <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-px bg-gradient-to-r from-transparent via-cyan-300/60 to-transparent" />
+            <video ref={camera.videoRef} className="aspect-video w-full object-contain" style={{ transform: "scaleX(1)" }} muted playsInline />
+            {camera.permission !== "granted" ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/70 backdrop-blur-sm">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-300/10 text-cyan-300"><Camera size={28} /></div>
+                <div className="mt-4 text-sm font-semibold text-white">Vision sensor offline</div>
+                <div className="mt-1 text-xs text-slate-500">Enable camera access to begin capture</div>
               </div>
-              {Array.from({ length: 9 }).map((_, index) => (
-                <div key={index} className="border border-white/50" />
-              ))}
+            ) : null}
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <div className="camera-mask relative grid aspect-square h-[62%] grid-cols-3 grid-rows-3 gap-0.5 rounded-xl border">
+                <div className="absolute -top-9 left-1/2 flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-full border border-white/10 bg-slate-950/90 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-white backdrop-blur">
+                  <span className={`h-3 w-3 rounded-full border border-white/70 ${colorClass[activeStep.topEdgeColor]}`} />
+                  {activeStep.topEdgeColor} edge on top
+                </div>
+                {Array.from({ length: 9 }).map((_, index) => <div key={index} className="border border-white/40" />)}
+              </div>
+            </div>
+            <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full border border-white/10 bg-slate-950/80 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-300 backdrop-blur">
+              <ShieldCheck size={13} className="text-emerald-300" />{cameraOrientationLabel}
+            </div>
+            <div className="absolute bottom-3 right-3 flex items-center gap-2 rounded-full border border-white/10 bg-slate-950/80 px-3 py-1.5 text-[10px] font-semibold text-slate-400 backdrop-blur">
+              <span className={`h-1.5 w-1.5 rounded-full ${camera.permission === "granted" ? "animate-pulse bg-emerald-400" : "bg-slate-600"}`} />
+              {camera.permission === "granted" ? "LIVE" : "STANDBY"}
             </div>
           </div>
-          <div className="absolute left-2 top-2 flex items-center gap-1 rounded bg-slate-950/80 px-2 py-1 text-[11px] font-semibold text-white">
-            <ShieldCheck size={13} aria-hidden="true" />
-            {cameraOrientationLabel}
+
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              {camera.permission === "granted" ? (
+                <Button icon={<VideoOff size={16} />} onClick={camera.stop}>Stop camera</Button>
+              ) : (
+                <Button icon={<Camera size={16} />} variant="primary" onClick={camera.start} disabled={camera.permission === "requesting"}>Enable camera</Button>
+              )}
+              <Button icon={<ScanLine size={16} />} variant="primary" onClick={capture} disabled={camera.permission !== "granted" || detecting}>
+                {detecting ? "Capturing…" : `Scan ${activeStep.centerColor} face`}
+              </Button>
+              {pendingScan ? (
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    const stickers = pendingScan.faceScan.stickers.map((sticker, index) => index === 4
+                      ? { ...sticker, color: activeStep.centerColor, confidence: 1, source: "manual" as const }
+                      : sticker);
+                    acceptFace({ ...pendingScan.faceScan, stickers });
+                  }}
+                >
+                  Confirm {activeStep.centerColor} center
+                </Button>
+              ) : null}
+            </div>
+            <div className={`mt-3 flex items-start gap-2 text-xs leading-5 ${pendingScan || camera.error ? "text-amber-200" : "text-slate-500"}`}>
+              {pendingScan || camera.error ? <CircleAlert className="mt-0.5 shrink-0" size={14} /> : <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-300" />}
+              <span>{camera.error ?? status}</span>
+            </div>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {camera.permission === "granted" ? (
-            <Button icon={<VideoOff size={16} />} onClick={camera.stop}>
-              Stop
-            </Button>
-          ) : (
-            <Button icon={<Camera size={16} />} variant="primary" onClick={camera.start} disabled={camera.permission === "requesting"}>
-              Enable camera
-            </Button>
-          )}
-          <Button icon={<ScanLine size={16} />} variant="primary" onClick={capture} disabled={camera.permission !== "granted" || detecting}>
-            {detecting ? "Checking center" : `Scan ${activeStep.centerColor} center`}
-          </Button>
-          {pendingScan ? (
-            <Button
-              variant="primary"
-              onClick={() => {
-                const stickers = pendingScan.faceScan.stickers.map((sticker, index) => index === 4
-                  ? { ...sticker, color: activeStep.centerColor, confidence: 1, source: "manual" as const }
-                  : sticker);
-                acceptFace({ ...pendingScan.faceScan, stickers });
-              }}
-            >
-              Confirm {activeStep.centerColor} center
-            </Button>
-          ) : null}
-          <span className={`text-sm ${pendingScan ? "font-semibold text-amber-700" : "text-slate-600"}`}>{camera.error ?? status}</span>
+
+        <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+          <div className="mb-4">
+            <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-300">Manual calibration</div>
+            <div className="mt-1 text-sm text-slate-400">Fine-tune detected stickers before validation.</div>
+          </div>
+          <FaceGridEditor faceScan={scan[activeFace]} onChange={onFaceScan} />
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-          {GUIDED_SCAN_STEPS.map((step, index) => (
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+        {GUIDED_SCAN_STEPS.map((step, index) => {
+          const complete = Boolean(scan[step.face]);
+          const active = activeFace === step.face;
+          return (
             <button
               key={step.face}
               type="button"
-              className={`flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-md border px-2 text-xs font-bold capitalize ${
-                activeFace === step.face ? "border-teal-700 bg-teal-50 text-teal-900" : "border-line bg-white text-slate-700"
-              }`}
+              className={`group relative flex min-h-14 min-w-0 items-center gap-3 overflow-hidden rounded-xl border px-3 text-left transition ${active ? "border-cyan-300/40 bg-cyan-300/10 shadow-[0_0_20px_rgba(34,211,238,.08)]" : "border-white/10 bg-white/[0.025] hover:border-white/20 hover:bg-white/[0.05]"}`}
               onClick={() => {
                 onActiveFace(step.face);
                 setPendingScan(null);
@@ -155,13 +177,16 @@ export function CameraScanner({
               }}
               aria-label={`Step ${index + 1}: scan ${step.centerColor} center`}
             >
-              {scan[step.face] ? <CheckCircle2 size={15} className="shrink-0 text-teal-700" /> : <span className={`h-3.5 w-3.5 shrink-0 rounded-full border border-slate-300 ${colorClass[step.centerColor]}`} />}
-              <span className="truncate">{step.centerColor}</span>
+              <div className="text-[10px] font-black text-slate-600">0{index + 1}</div>
+              {complete ? <CheckCircle2 size={17} className="shrink-0 text-emerald-300" /> : <span className={`h-4 w-4 shrink-0 rounded-full border-2 border-slate-900 ${colorClass[step.centerColor]}`} />}
+              <div className="min-w-0">
+                <div className={`truncate text-xs font-bold capitalize ${active ? "text-cyan-100" : "text-slate-300"}`}>{step.centerColor}</div>
+                <div className="truncate text-[9px] uppercase tracking-wider text-slate-600">{complete ? "Captured" : "Pending"}</div>
+              </div>
             </button>
-          ))}
-        </div>
+          );
+        })}
       </div>
-      <FaceGridEditor faceScan={scan[activeFace]} onChange={onFaceScan} />
     </div>
   );
 }

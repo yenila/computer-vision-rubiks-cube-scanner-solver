@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CUBE_COLOR_RGB } from "@rubiks/shared";
-import { classifyStickerSamples, robustAverageRgb } from "./opencvDetector";
+import { classifyStickerSamples, isOpenCvReady, robustAverageRgb } from "./opencvDetector";
 function pixels(values) {
     return new Uint8ClampedArray(values.flatMap(([r, g, b]) => [r, g, b, 255]));
 }
@@ -32,5 +32,27 @@ describe("camera sticker sampling", () => {
         expect(result.stickers[4]?.color).toBe("yellow");
         expect(result.stickers[0]?.color).toBe("green");
         expect(result.stickers[4]?.rgb).toEqual(cameraYellow);
+    });
+    it("keeps cyan-shifted blue and magenta-shifted red distinct on the first face", () => {
+        const samples = [
+            { r: 210, g: 222, b: 226 },
+            { r: 70, g: 184, b: 220 },
+            { r: 244, g: 121, b: 63 },
+            { r: 65, g: 181, b: 218 },
+            { r: 67, g: 205, b: 105 },
+            { r: 72, g: 177, b: 216 },
+            { r: 75, g: 214, b: 99 },
+            { r: 61, g: 201, b: 104 },
+            { r: 214, g: 48, b: 82 }
+        ];
+        const clonedPalette = Object.fromEntries(Object.entries(CUBE_COLOR_RGB).map(([color, rgb]) => [color, { ...rgb }]));
+        const result = classifyStickerSamples(samples, clonedPalette, "green");
+        expect(result.stickers.map((sticker) => sticker.color)).toEqual([
+            "white", "blue", "orange", "blue", "green", "blue", "green", "green", "red"
+        ]);
+    });
+    it("does not report OpenCV ready until Mat constructors exist", () => {
+        expect(isOpenCvReady({ Mat: {}, MatVector: {}, imread: () => ({}) })).toBe(false);
+        expect(isOpenCvReady({ Mat: function Mat() { }, MatVector: function MatVector() { }, imread: () => ({}) })).toBe(true);
     });
 });

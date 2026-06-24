@@ -121,16 +121,35 @@ function classifyByRgb(rgb: Rgb, palette: Record<CubeColor, Rgb>): ClassifiedCol
   return { color: best.color, distance: best.distance, confidence };
 }
 
+function hasRealCalibration(palette: Record<CubeColor, Rgb>): boolean {
+  return COLOR_ORDER.some((color) => {
+    const current = palette[color];
+    const baseline = CUBE_COLOR_RGB[color];
+    return Math.abs(current.r - baseline.r) + Math.abs(current.g - baseline.g) + Math.abs(current.b - baseline.b) >= 18;
+  });
+}
+
 export function classifyColor(rgb: Rgb, palette: Record<CubeColor, Rgb> = CUBE_COLOR_RGB): ClassifiedColor {
   const hueMatch = classifyByHue(rgb);
   const rgbMatch = classifyByRgb(rgb, palette);
-  if (!hueMatch || palette !== CUBE_COLOR_RGB) return rgbMatch;
-  if (hueMatch.color === rgbMatch.color || hueMatch.color === "white" || rgbMatch.color === "white") return hueMatch;
+  if (!hueMatch) return rgbMatch;
 
-  // Camera white balance often moves red/orange hues across their narrow boundary.
-  // Prefer the RGB/chroma result only when it is materially more decisive.
-  if (rgbMatch.confidence >= hueMatch.confidence + 0.12) {
-    return { ...rgbMatch, confidence: Math.min(0.95, (rgbMatch.confidence + hueMatch.confidence) / 2) };
+  if (hueMatch.color === rgbMatch.color) {
+    return {
+      color: hueMatch.color,
+      distance: Math.min(hueMatch.distance, rgbMatch.distance),
+      confidence: Math.min(0.99, Math.max(hueMatch.confidence, rgbMatch.confidence))
+    };
+  }
+
+  // A copied default palette is not calibration. On an uncalibrated camera, hue is
+  // substantially more stable than absolute RGB under exposure and white-balance shifts.
+  if (!hasRealCalibration(palette)) return hueMatch;
+
+  // Once actual center samples exist, allow a close and decisive camera-space match
+  // to override hue. This is important for yellow/white centers under colored light.
+  if (rgbMatch.distance <= 85 && rgbMatch.confidence >= 0.68) {
+    return { ...rgbMatch, confidence: Math.min(0.97, Math.max(0.55, rgbMatch.confidence)) };
   }
 
   return hueMatch;
