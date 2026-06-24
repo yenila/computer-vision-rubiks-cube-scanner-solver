@@ -46,11 +46,43 @@ CORS_ORIGIN="http://localhost:5173"
 PORT="4000"
 VITE_API_URL="http://localhost:4000/api"
 VITE_OPENCV_URL="https://docs.opencv.org/4.x/opencv.js"
+VITE_APP_MODE="fullstack"
 ```
 
 For production, use a strong `JWT_SECRET`, HTTPS, managed PostgreSQL, a pinned OpenCV.js asset, and a restricted `CORS_ORIGIN`.
 
-## Production deployment
+## Portfolio deployment — frontend only
+
+Demo Mode turns the project into a static portfolio application. It needs no API host, database host, Prisma migration, payment method, or server secrets.
+
+The static demo retains the recruiter-facing workflow:
+
+- Live camera capture, OpenCV-assisted detection, and manual sticker correction.
+- One-click sample scrambled cube for testing without a physical cube.
+- Verified `cubejs` solving inside a Web Worker so the interface remains responsive.
+- Interactive 3D cube and guided move playback.
+- Browser-local scan history, solve history, and a demo leaderboard using `localStorage`.
+- An explicit “Portfolio demo” label so local data is not presented as a hosted account.
+
+Production builds default to Demo Mode when `VITE_APP_MODE` is not set. Set it explicitly on a static host for clarity:
+
+```bash
+VITE_APP_MODE="demo"
+```
+
+### Vercel
+
+Import the repository with the repository root selected. The included `vercel.json` uses:
+
+- Build command: `npm run build:web`
+- Output directory: `apps/web/dist`
+- Environment variable: `VITE_APP_MODE=demo`
+
+### Netlify
+
+Import the repository normally. The included `netlify.toml` already defines the build command, publish directory, Node version, Demo Mode, and SPA fallback.
+
+## Optional full-stack production deployment
 
 The repository includes `render.yaml` for the API and `vercel.json` for the frontend.
 
@@ -81,6 +113,7 @@ Import the repository into Vercel with the repository root as the project root. 
 
 ```bash
 VITE_API_URL="https://<your-render-service>.onrender.com/api"
+VITE_APP_MODE="fullstack"
 ```
 
 `vercel.json` runs the workspace build and publishes `apps/web/dist`. After Vercel assigns the final domain, update Render's `CORS_ORIGIN` to that exact HTTPS origin and redeploy the API. Multiple allowed origins can be supplied as a comma-separated list.

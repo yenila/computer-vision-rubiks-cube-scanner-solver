@@ -1,10 +1,19 @@
-import { LogIn, LogOut, UserPlus } from "lucide-react";
+import { Database, LogIn, LogOut, RotateCcw, UserPlus } from "lucide-react";
 import { useState } from "react";
 import type { ApiSession } from "../lib/api";
 import { api } from "../lib/api";
+import { isDemoMode } from "../lib/appMode";
 import { Button } from "./Button";
 
-export function AuthPanel({ session, onSession }: { session: ApiSession | null; onSession: (session: ApiSession | null) => void }) {
+export function AuthPanel({
+  session,
+  onSession,
+  onDataReset
+}: {
+  session: ApiSession | null;
+  onSession: (session: ApiSession | null) => void;
+  onDataReset?: () => void;
+}) {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -24,6 +33,33 @@ export function AuthPanel({ session, onSession }: { session: ApiSession | null; 
       setLoading(false);
     }
   };
+
+  if (isDemoMode && session) {
+    return (
+      <div className="space-y-3">
+        <div className="rounded-md border border-teal-200 bg-teal-50 p-3">
+          <div className="flex items-center gap-2 text-sm font-semibold text-teal-900">
+            <Database size={16} />
+            Browser-local profile
+          </div>
+          <p className="mt-1 text-sm text-teal-800">Scans and solves stay on this device. No account or server is required.</p>
+        </div>
+        <div>
+          <div className="text-sm font-semibold text-ink">{session.user.name}</div>
+          <div className="text-sm text-slate-600">{session.user.email}</div>
+        </div>
+        <Button
+          icon={<RotateCcw size={16} />}
+          onClick={async () => {
+            await api.resetDemoData();
+            onDataReset?.();
+          }}
+        >
+          Reset demo data
+        </Button>
+      </div>
+    );
+  }
 
   if (session) {
     return (

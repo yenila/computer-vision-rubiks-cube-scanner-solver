@@ -2,13 +2,14 @@ import { Trophy } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api, type LeaderboardEntry } from "../lib/api";
 
-export function Leaderboard() {
+export function Leaderboard({ refreshKey = 0 }: { refreshKey?: number }) {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    setError(null);
     api.leaderboard().then(setEntries).catch((leaderboardError) => setError(leaderboardError instanceof Error ? leaderboardError.message : "Failed to load leaderboard."));
-  }, []);
+  }, [refreshKey]);
 
   if (error) return <div className="text-sm text-red-700">{error}</div>;
 

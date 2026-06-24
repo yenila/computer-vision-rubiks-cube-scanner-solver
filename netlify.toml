@@ -1,0 +1,12 @@
+[build]
+  command = "npm run build:web"
+  publish = "apps/web/dist"
+
+[build.environment]
+  NODE_VERSION = "20.18.0"
+  VITE_APP_MODE = "demo"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

@@ -2,20 +2,21 @@ import { useEffect, useState } from "react";
 import type { ApiSession, ScanRecord, SolveRecord } from "../lib/api";
 import { api } from "../lib/api";
 
-export function HistoryPanel({ session }: { session: ApiSession | null }) {
+export function HistoryPanel({ session, refreshKey = 0 }: { session: ApiSession | null; refreshKey?: number }) {
   const [scans, setScans] = useState<ScanRecord[]>([]);
   const [solves, setSolves] = useState<SolveRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!session) return;
+    setError(null);
     Promise.all([api.listScans(session.token), api.listSolves(session.token)])
       .then(([nextScans, nextSolves]) => {
         setScans(nextScans);
         setSolves(nextSolves);
       })
       .catch((historyError) => setError(historyError instanceof Error ? historyError.message : "Failed to load history."));
-  }, [session]);
+  }, [session, refreshKey]);
 
   if (!session) return <div className="text-sm text-slate-600">Sign in to save scans and solve history.</div>;
   if (error) return <div className="text-sm text-red-700">{error}</div>;

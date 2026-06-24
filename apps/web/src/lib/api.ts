@@ -1,4 +1,15 @@
 import type { AuthUser, CubeScanState, SolveResult } from "@rubiks/shared";
+import { isDemoMode } from "./appMode";
+import {
+  createDemoScan,
+  createDemoSolve,
+  demoSession,
+  listDemoLeaderboard,
+  listDemoScans,
+  listDemoSolves,
+  resetDemoData
+} from "./demoData";
+import { solveInBrowser } from "./demoSolver";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000/api";
 const REQUEST_TIMEOUT_MS = import.meta.env.PROD ? 45000 : 10000;
@@ -64,7 +75,7 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
   return payload as T;
 }
 
-export const api = {
+const remoteApi = {
   register: (input: { email: string; password: string; name: string }) =>
     request<ApiSession>("/auth/register", { method: "POST", body: JSON.stringify(input) }),
   login: (input: { email: string; password: string }) =>
@@ -76,5 +87,20 @@ export const api = {
   listSolves: (token: string) => request<SolveRecord[]>("/solves", {}, token),
   createSolve: (token: string, input: { scanId?: string; solution: SolveResult; durationMs: number }) =>
     request<SolveRecord>("/solves", { method: "POST", body: JSON.stringify(input) }, token),
-  leaderboard: () => request<LeaderboardEntry[]>("/leaderboard")
+  leaderboard: () => request<LeaderboardEntry[]>("/leaderboard"),
+  resetDemoData: async (): Promise<void> => undefined
 };
+
+const demoApi: typeof remoteApi = {
+  register: async () => demoSession,
+  login: async () => demoSession,
+  solve: solveInBrowser,
+  listScans: async () => listDemoScans(),
+  createScan: async (_token, input) => createDemoScan(input),
+  listSolves: async () => listDemoSolves(),
+  createSolve: async (_token, input) => createDemoSolve(input),
+  leaderboard: async () => listDemoLeaderboard(),
+  resetDemoData: async () => resetDemoData()
+};
+
+export const api = isDemoMode ? demoApi : remoteApi;

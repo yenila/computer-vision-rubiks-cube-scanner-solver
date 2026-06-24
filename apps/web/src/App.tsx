@@ -1,4 +1,4 @@
-import { Save, ShieldCheck } from "lucide-react";
+import { CloudOff, Save, ShieldCheck, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   createEmptyScanState,
@@ -12,6 +12,8 @@ import {
   type SolveResult
 } from "@rubiks/shared";
 import { api, type ApiSession } from "./lib/api";
+import { isDemoMode } from "./lib/appMode";
+import { createSampleScan, demoSession } from "./lib/demoData";
 import { AuthPanel } from "./components/AuthPanel";
 import { Button } from "./components/Button";
 import { CameraScanner } from "./components/CameraScanner";
@@ -28,8 +30,13 @@ export function App() {
   const [scan, setScan] = useState<CubeScanState>(() => createEmptyScanState());
   const [activeFace, setActiveFace] = useState<CubeFace>("F");
   const [session, setSession] = useState<ApiSession | null>(() => {
+    if (isDemoMode) return demoSession;
     const raw = localStorage.getItem("rubiks-session");
-    return raw ? (JSON.parse(raw) as ApiSession) : null;
+    try {
+      return raw ? (JSON.parse(raw) as ApiSession) : null;
+    } catch {
+      return null;
+    }
   });
   const [solution, setSolution] = useState<SolveResult | null>(null);
   const [moveHistory, setMoveHistory] = useState<MoveToken[]>([]);
@@ -37,6 +44,7 @@ export function App() {
   const [message, setMessage] = useState<string | null>(null);
   const [isSolving, setIsSolving] = useState(false);
   const [solveStatus, setSolveStatus] = useState<SolveStatus>("unchecked");
+  const [dataRevision, setDataRevision] = useState(0);
   const validation = useMemo(() => validateCubeScan(scan), [scan]);
 
   const statusLabel = !validation.valid
@@ -50,6 +58,7 @@ export function App() {
   const statusColor = !validation.valid ? "text-slate-400" : solveStatus === "not_solvable" ? "text-amber-700" : "text-teal-700";
 
   useEffect(() => {
+    if (isDemoMode) return;
     if (session) localStorage.setItem("rubiks-session", JSON.stringify(session));
     else localStorage.removeItem("rubiks-session");
   }, [session]);
@@ -99,7 +108,8 @@ export function App() {
     try {
       const saved = await api.createScan(session.token, { name: `Scan ${new Date().toLocaleString()}`, scan, solution: solution ?? undefined });
       if (solution) await api.createSolve(session.token, { scanId: saved.id, solution, durationMs: Math.max(1000, solution.moves.length * 850) });
-      setMessage("Scan saved.");
+      setDataRevision((current) => current + 1);
+      setMessage(isDemoMode ? "Saved in this browser." : "Scan saved.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Save failed.");
     }
@@ -113,9 +123,17 @@ export function App() {
             <h1 className="text-2xl font-black tracking-normal text-ink">Computer Vision Rubik’s Cube Scanner and Solver</h1>
             <p className="text-sm text-slate-600">Scan, correct, solve, replay, and track cube solves.</p>
           </div>
-          <div className="flex items-center gap-2 rounded-md border border-line bg-slate-50 px-3 py-2 text-sm">
-            <ShieldCheck size={17} className={statusColor} />
-            {statusLabel}
+          <div className="flex flex-wrap items-center gap-2">
+            {isDemoMode ? (
+              <div className="flex items-center gap-2 rounded-md border border-teal-200 bg-teal-50 px-3 py-2 text-sm font-semibold text-teal-800">
+                <CloudOff size={17} />
+                Portfolio demo · runs in your browser
+              </div>
+            ) : null}
+            <div className="flex items-center gap-2 rounded-md border border-line bg-slate-50 px-3 py-2 text-sm">
+              <ShieldCheck size={17} className={statusColor} />
+              {statusLabel}
+            </div>
           </div>
         </div>
       </header>
@@ -128,9 +146,25 @@ export function App() {
           <Panel
             title="Validation and solving"
             actions={
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
+                {isDemoMode ? (
+                  <Button
+                    icon={<Sparkles size={16} />}
+                    onClick={() => {
+                      setScan(createSampleScan());
+                      setActiveFace("F");
+                      setSolution(null);
+                      setMoveHistory([]);
+                      setActiveMove(null);
+                      setSolveStatus("unchecked");
+                      setMessage("Sample scrambled cube loaded. Generate its solution or edit any sticker.");
+                    }}
+                  >
+                    Load sample cube
+                  </Button>
+                ) : null}
                 <Button icon={<Save size={16} />} onClick={saveScan}>
-                  Save
+                  {isDemoMode ? "Save locally" : "Save"}
                 </Button>
                 <Button variant="primary" onClick={solve} disabled={!validation.valid || isSolving}>
                   {isSolving ? "Generating" : "Generate solution"}
@@ -175,14 +209,18 @@ export function App() {
         </div>
 
         <aside className="space-y-4">
-          <Panel title="Account">
-            <AuthPanel session={session} onSession={setSession} />
+          <Panel title={isDemoMode ? "Demo session" : "Account"}>
+            <AuthPanel
+              session={session}
+              onSession={setSession}
+              onDataReset={() => setDataRevision((current) => current + 1)}
+            />
           </Panel>
           <Panel title="History">
-            <HistoryPanel session={session} />
+            <HistoryPanel session={session} refreshKey={dataRevision} />
           </Panel>
-          <Panel title="Global leaderboard">
-            <Leaderboard />
+          <Panel title={isDemoMode ? "Demo leaderboard" : "Global leaderboard"}>
+            <Leaderboard refreshKey={dataRevision} />
           </Panel>
         </aside>
       </div>
