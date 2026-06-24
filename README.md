@@ -50,6 +50,51 @@ VITE_OPENCV_URL="https://docs.opencv.org/4.x/opencv.js"
 
 For production, use a strong `JWT_SECRET`, HTTPS, managed PostgreSQL, a pinned OpenCV.js asset, and a restricted `CORS_ORIGIN`.
 
+## Production deployment
+
+The repository includes `render.yaml` for the API and `vercel.json` for the frontend.
+
+### 1. Neon PostgreSQL
+
+Create a Neon project and copy both connection strings:
+
+- `DATABASE_URL`: the pooled connection string used by the running API.
+- `DIRECT_URL`: the direct connection string used by Prisma migrations.
+
+Keep SSL enabled in both Neon connection strings. Do not run the development seed against production.
+
+### 2. Render API
+
+Create a Render Blueprint from this repository. Set these secret environment variables when prompted:
+
+```bash
+DATABASE_URL="<neon-pooled-connection-string>"
+DIRECT_URL="<neon-direct-connection-string>"
+CORS_ORIGIN="https://<your-vercel-domain>"
+```
+
+Render generates `JWT_SECRET` from the Blueprint. The build compiles the shared package and API, and the start command runs committed Prisma migrations before starting Express. The health check is `/api/health`.
+
+### 3. Vercel frontend
+
+Import the repository into Vercel with the repository root as the project root. Add this production environment variable:
+
+```bash
+VITE_API_URL="https://<your-render-service>.onrender.com/api"
+```
+
+`vercel.json` runs the workspace build and publishes `apps/web/dist`. After Vercel assigns the final domain, update Render's `CORS_ORIGIN` to that exact HTTPS origin and redeploy the API. Multiple allowed origins can be supplied as a comma-separated list.
+
+### Deployment checks
+
+```bash
+npm ci
+npm run prisma:generate
+npm run lint
+npm run test
+npm run build
+```
+
 ## Scripts
 
 ```bash

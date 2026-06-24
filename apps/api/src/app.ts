@@ -11,8 +11,23 @@ import { solveRoutes } from "./routes/solveRoutes";
 
 export function createApp() {
   const app = express();
+  const allowedOrigins = env.CORS_ORIGIN.split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
   app.use(helmet());
-  app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
+  app.use(
+    cors({
+      credentials: true,
+      origin(origin, callback) {
+        if (!origin || allowedOrigins.includes(origin)) {
+          callback(null, true);
+          return;
+        }
+        callback(new Error("Origin is not allowed by CORS"));
+      }
+    })
+  );
   app.use(express.json({ limit: "1mb" }));
   app.use(morgan(env.NODE_ENV === "test" ? "tiny" : "combined"));
 

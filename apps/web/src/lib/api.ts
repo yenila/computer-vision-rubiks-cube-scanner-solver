@@ -1,6 +1,7 @@
 import type { AuthUser, CubeScanState, SolveResult } from "@rubiks/shared";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000/api";
+const REQUEST_TIMEOUT_MS = import.meta.env.PROD ? 45000 : 10000;
 
 export type ApiSession = {
   token: string;
@@ -33,7 +34,7 @@ export type LeaderboardEntry = {
 
 async function request<T>(path: string, options: RequestInit = {}, token?: string): Promise<T> {
   const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), 10000);
+  const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   let response: Response;
   try {
@@ -48,7 +49,7 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
     });
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
-      throw new Error("Request timed out. Check the scan and try again.");
+      throw new Error("The API took too long to respond. Please try again in a moment.");
     }
     throw error;
   } finally {

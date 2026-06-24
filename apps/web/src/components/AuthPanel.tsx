@@ -6,9 +6,9 @@ import { Button } from "./Button";
 
 export function AuthPanel({ session, onSession }: { session: ApiSession | null; onSession: (session: ApiSession | null) => void }) {
   const [mode, setMode] = useState<"login" | "register">("login");
-  const [email, setEmail] = useState("demo@rubiks.local");
-  const [name, setName] = useState("Demo Solver");
-  const [password, setPassword] = useState("password123");
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

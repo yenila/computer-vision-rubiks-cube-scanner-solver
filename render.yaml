@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: cubevision-api
+    runtime: node
+    buildCommand: npm ci && npm run build:shared && npm run prisma:generate && npm run build:api
+    startCommand: npm run prisma:deploy && npm --workspace apps/api run start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 20.18.0
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: CORS_ORIGIN
+        sync: false
