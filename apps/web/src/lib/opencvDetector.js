@@ -1,17 +1,75 @@
 import { CUBE_COLOR_RGB, classifyColor } from "@rubiks/shared";
 let openCvPromise = null;
+let readyOpenCv = null;
+export function isOpenCvReady(candidate) {
+    if (!candidate || typeof candidate !== "object")
+        return false;
+    const value = candidate;
+    return typeof value.Mat === "function" && typeof value.MatVector === "function" && typeof value.imread === "function";
+}
+async function resolveOpenCv(candidate, timeoutMs = 8000) {
+    try {
+        const resolved = candidate && typeof candidate.then === "function"
+            ? await candidate
+            : candidate;
+        if (isOpenCvReady(resolved))
+            return resolved;
+        if (!resolved || typeof resolved !== "object")
+            return null;
+        return await new Promise((resolve) => {
+            const runtime = resolved;
+            const previousInitializer = runtime.onRuntimeInitialized;
+            let settled = false;
+            const finish = (value) => {
+                if (settled)
+                    return;
+                settled = true;
+                window.clearInterval(pollId);
+                window.clearTimeout(timeoutId);
+                resolve(value);
+            };
+            const check = () => {
+                if (isOpenCvReady(runtime))
+                    finish(runtime);
+            };
+            runtime.onRuntimeInitialized = () => {
+                previousInitializer?.();
+                check();
+            };
+            const pollId = window.setInterval(check, 50);
+            const timeoutId = window.setTimeout(() => finish(null), timeoutMs);
+            check();
+        });
+    }
+    catch {
+        return null;
+    }
+}
 export function loadOpenCv() {
-    if (window.cv)
+    if (readyOpenCv)
         return Promise.resolve(true);
     if (openCvPromise)
         return openCvPromise;
-    openCvPromise = new Promise((resolve) => {
-        const script = document.createElement("script");
-        script.async = true;
-        script.src = import.meta.env.VITE_OPENCV_URL ?? "https://docs.opencv.org/4.x/opencv.js";
-        script.onload = () => resolve(Boolean(window.cv));
-        script.onerror = () => resolve(false);
-        document.head.appendChild(script);
+    openCvPromise = (async () => {
+        if (!window.cv) {
+            const loaded = await new Promise((resolve) => {
+                const script = document.createElement("script");
+                script.async = true;
+                script.dataset.opencvLoader = "true";
+                script.src = import.meta.env.VITE_OPENCV_URL ?? "https://docs.opencv.org/4.x/opencv.js";
+                script.onload = () => resolve(true);
+                script.onerror = () => resolve(false);
+                document.head.appendChild(script);
+            });
+            if (!loaded)
+                return false;
+        }
+        readyOpenCv = await resolveOpenCv(window.cv);
+        return Boolean(readyOpenCv);
+    })().then((ready) => {
+        if (!ready)
+            openCvPromise = null;
+        return ready;
     });
     return openCvPromise;
 }
@@ -58,7 +116,7 @@ function gridCenters(width, height) {
     });
 }
 function detectOpenCvCenters(canvas) {
-    const cv = window.cv;
+    const cv = readyOpenCv;
     if (!cv)
         return [];
     const src = cv.imread(canvas);
@@ -68,11 +126,12 @@ function detectOpenCvCenters(canvas) {
     const channels = new cv.MatVector();
     const contours = new cv.MatVector();
     const hierarchy = new cv.Mat();
+    let saturation = null;
     try {
         cv.cvtColor(src, rgb, cv.COLOR_RGBA2RGB);
         cv.cvtColor(rgb, hsv, cv.COLOR_RGB2HSV);
         cv.split(hsv, channels);
-        const saturation = channels.get(1);
+        saturation = channels.get(1);
         cv.threshold(saturation, mask, 34, 255, cv.THRESH_BINARY);
         cv.findContours(mask, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
         const minArea = (canvas.width * canvas.height) / 2500;
@@ -80,24 +139,27 @@ function detectOpenCvCenters(canvas) {
         const candidates = [];
         for (let i = 0; i < contours.size(); i += 1) {
             const contour = contours.get(i);
-            const area = cv.contourArea(contour);
-            const rect = cv.boundingRect(contour);
-            const ratio = rect.width / Math.max(1, rect.height);
-            const withinCenter = Math.abs(rect.x + rect.width / 2 - canvas.width / 2) < canvas.width * 0.38 && Math.abs(rect.y + rect.height / 2 - canvas.height / 2) < canvas.height * 0.38;
-            if (area > minArea && area < maxArea && ratio > 0.55 && ratio < 1.55 && withinCenter) {
-                candidates.push({
-                    x: rect.x + rect.width / 2,
-                    y: rect.y + rect.height / 2,
-                    size: Math.max(10, Math.floor(Math.min(rect.width, rect.height) * 0.45)),
-                    area
-                });
+            try {
+                const area = cv.contourArea(contour);
+                const rect = cv.boundingRect(contour);
+                const ratio = rect.width / Math.max(1, rect.height);
+                const withinCenter = Math.abs(rect.x + rect.width / 2 - canvas.width / 2) < canvas.width * 0.38 && Math.abs(rect.y + rect.height / 2 - canvas.height / 2) < canvas.height * 0.38;
+                if (area > minArea && area < maxArea && ratio > 0.55 && ratio < 1.55 && withinCenter) {
+                    candidates.push({
+                        x: rect.x + rect.width / 2,
+                        y: rect.y + rect.height / 2,
+                        size: Math.max(10, Math.floor(Math.min(rect.width, rect.height) * 0.45)),
+                        area
+                    });
+                }
             }
-            contour.delete();
+            finally {
+                contour.delete();
+            }
         }
-        saturation.delete();
         if (candidates.length < 9)
             return [];
-        return candidates
+        const centers = candidates
             .sort((a, b) => b.area - a.area)
             .slice(0, 9)
             .sort((a, b) => a.y - b.y)
@@ -107,8 +169,17 @@ function detectOpenCvCenters(canvas) {
             }
             return rows;
         }, []);
+        const rows = [centers.slice(0, 3), centers.slice(3, 6), centers.slice(6, 9)];
+        const rowSpreadValid = rows.every((row) => Math.max(...row.map((item) => item.y)) - Math.min(...row.map((item) => item.y)) < canvas.height * 0.1);
+        const columns = [0, 1, 2].map((column) => rows.map((row) => row[column]));
+        const columnSpreadValid = columns.every((column) => Math.max(...column.map((item) => item.x)) - Math.min(...column.map((item) => item.x)) < canvas.width * 0.1);
+        const centerX = centers.reduce((sum, item) => sum + item.x, 0) / centers.length;
+        const centerY = centers.reduce((sum, item) => sum + item.y, 0) / centers.length;
+        const centered = Math.abs(centerX - canvas.width / 2) < canvas.width * 0.12 && Math.abs(centerY - canvas.height / 2) < canvas.height * 0.12;
+        return rowSpreadValid && columnSpreadValid && centered ? centers : [];
     }
     finally {
+        saturation?.delete();
         src.delete();
         rgb.delete();
         hsv.delete();
@@ -146,8 +217,22 @@ export async function detectFace(video, face, options = {}) {
     if (!ctx)
         throw new Error("Canvas 2D context is unavailable.");
     ctx.drawImage(video, 0, 0, width, height);
-    const hasOpenCv = await loadOpenCv();
-    const openCvCenters = hasOpenCv ? detectOpenCvCenters(canvas) : [];
+    // Never make a capture wait for the remote OpenCV runtime. The aligned grid
+    // is deterministic and immediately available; OpenCV is an optional upgrade
+    // only after its background initialization has completed.
+    const hasOpenCv = Boolean(readyOpenCv);
+    let openCvCenters = [];
+    let openCvFailed = false;
+    if (hasOpenCv) {
+        try {
+            openCvCenters = detectOpenCvCenters(canvas);
+        }
+        catch {
+            // OpenCV builds differ across CDN/runtime variants. Detection must always
+            // degrade to the aligned grid instead of blocking the first capture.
+            openCvFailed = true;
+        }
+    }
     const centers = openCvCenters.length === 9 ? openCvCenters : gridCenters(width, height);
     const samples = centers.map((center) => sampleAverage(ctx, Math.floor(center.x - center.size / 2), Math.floor(center.y - center.size / 2), center.size));
     const { stickers, detectedCenter } = classifyStickerSamples(samples, options.palette, options.expectedCenter);
@@ -159,7 +244,11 @@ export async function detectFace(video, face, options = {}) {
         },
         debug: {
             mode: openCvCenters.length === 9 ? "opencv" : "fallback-grid",
-            message: openCvCenters.length === 9 ? "OpenCV.js detected nine sticker candidates." : "Using calibrated center grid fallback.",
+            message: openCvCenters.length === 9
+                ? "OpenCV.js detected nine regular sticker candidates."
+                : openCvFailed
+                    ? "OpenCV was unavailable at capture time; used the aligned grid safely."
+                    : "Using the aligned center grid for stable sampling.",
             detectedCenter
         }
     };

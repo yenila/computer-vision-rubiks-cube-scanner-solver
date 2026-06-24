@@ -8,7 +8,7 @@ describe("WelcomeScreen", () => {
 
     render(<WelcomeScreen onSession={vi.fn()} onContinueAsGuest={continueAsGuest} />);
 
-    expect(screen.getByRole("heading", { name: "Start solving" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Enter CubeVision" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Sign in" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Continue as guest" }));

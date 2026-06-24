@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyColor } from "./colors";
+import { CUBE_COLOR_RGB, classifyColor } from "./colors";
 
 describe("camera color classification", () => {
   it.each([
@@ -44,5 +44,14 @@ describe("camera color classification", () => {
     { r: 42, g: 65, b: 126 }
   ])("keeps genuine blue samples %o blue", (rgb) => {
     expect(classifyColor(rgb).color).toBe("blue");
+  });
+
+  it("does not mistake a cloned default palette for camera calibration", () => {
+    const clonedPalette = Object.fromEntries(
+      Object.entries(CUBE_COLOR_RGB).map(([color, rgb]) => [color, { ...rgb }])
+    ) as typeof CUBE_COLOR_RGB;
+
+    expect(classifyColor({ r: 70, g: 184, b: 220 }, clonedPalette).color).toBe("blue");
+    expect(classifyColor({ r: 214, g: 48, b: 82 }, clonedPalette).color).toBe("red");
   });
 });

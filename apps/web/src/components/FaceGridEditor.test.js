@@ -14,4 +14,13 @@ describe("FaceGridEditor", () => {
         fireEvent.change(screen.getByLabelText("Sticker 1"), { target: { value: "red" } });
         expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ stickers: expect.arrayContaining([expect.objectContaining({ color: "red", source: "manual" })]) }));
     });
+    it("renders a persistent visible selector for every sticker", () => {
+        render(_jsx(FaceGridEditor, { faceScan: faceScan, onChange: vi.fn() }));
+        const selectors = screen.getAllByRole("combobox");
+        expect(selectors).toHaveLength(9);
+        selectors.forEach((selector) => {
+            expect(selector).not.toHaveClass("opacity-0");
+            expect(selector).toHaveAttribute("title", expect.stringContaining("Change sticker"));
+        });
+    });
 });

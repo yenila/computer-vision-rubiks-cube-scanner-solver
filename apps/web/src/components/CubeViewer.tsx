@@ -27,7 +27,7 @@ function Sticker({ position, rotation, color }: { position: [number, number, num
   return (
     <mesh position={position} rotation={rotation}>
       <planeGeometry args={[0.78, 0.78]} />
-      <meshStandardMaterial color={stickerMaterials[color]} roughness={0.34} metalness={0.08} />
+      <meshStandardMaterial color={stickerMaterials[color]} emissive={stickerMaterials[color]} emissiveIntensity={0.04} roughness={0.28} metalness={0.14} />
     </mesh>
   );
 }
@@ -45,7 +45,7 @@ function Cubie({ x, y, z, facelets }: { x: number; y: number; z: number; facelet
     <group position={[x * 1.05, y * 1.05, z * 1.05]}>
       <mesh castShadow receiveShadow>
         <boxGeometry args={[0.96, 0.96, 0.96]} />
-        <meshStandardMaterial color="#1f2937" metalness={0.56} roughness={0.3} />
+        <meshStandardMaterial color="#7f8a9b" metalness={0.92} roughness={0.22} />
       </mesh>
       {stickers}
     </group>
@@ -103,31 +103,47 @@ function AnimatedCube({ activeMove, facelets }: { activeMove: MoveToken | null; 
 
 export function CubeViewer({ activeMove, moveHistory, facelets }: { activeMove: MoveToken | null; moveHistory: MoveToken[]; facelets?: string | null }) {
   const baseFacelets = facelets && /^[URFDLB]{54}$/.test(facelets) ? facelets : SOLVED_FACELETS;
-  const completedMoves = activeMove
-    ? moveHistory.at(-1) === activeMove
-      ? moveHistory.slice(0, -1)
-      : [...moveHistory, invertMove(activeMove)]
-    : moveHistory;
-  const visualFacelets = useMemo(() => applyMovesToFacelets(baseFacelets, completedMoves), [baseFacelets, completedMoves]);
+  const visualFacelets = useMemo(() => {
+    const completedMoves = activeMove
+      ? moveHistory.at(-1) === activeMove
+        ? moveHistory.slice(0, -1)
+        : [...moveHistory, invertMove(activeMove)]
+      : moveHistory;
+    return applyMovesToFacelets(baseFacelets, completedMoves);
+  }, [activeMove, baseFacelets, moveHistory]);
 
   return (
-    <div className="relative h-[400px] min-h-[340px] overflow-hidden rounded-lg border border-line bg-slate-100">
-      <div className="pointer-events-none absolute left-3 top-3 z-10 rounded-md border border-white/70 bg-white/90 px-2.5 py-2 text-xs font-semibold text-slate-700 shadow-sm">
-        <div className="mb-1 font-black text-teal-800">View locked</div>
-        <div>White: top</div>
-        <div>Green: front</div>
-        <div>Red: right</div>
+    <div className="relative h-[430px] min-h-[360px] overflow-hidden rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_50%_42%,rgba(34,211,238,.12),transparent_32%),linear-gradient(180deg,#070b13,#020409)] shadow-[inset_0_1px_0_rgba(255,255,255,.06),0_24px_60px_rgba(0,0,0,.35)]">
+      <div className="pointer-events-none absolute inset-x-12 top-0 z-10 h-px bg-gradient-to-r from-transparent via-cyan-300/50 to-transparent" />
+      <div className="pointer-events-none absolute left-4 top-4 z-10 rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400 shadow-lg backdrop-blur-xl">
+        <div className="mb-1.5 flex items-center gap-1.5 font-black text-cyan-300"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-cyan-300" /> Spatial frame locked</div>
+        <div>White / zenith</div>
+        <div>Green / forward</div>
+        <div>Red / right</div>
       </div>
       {activeMove ? (
-        <div className="pointer-events-none absolute right-3 top-3 z-10 rounded-md bg-teal-800 px-3 py-2 text-sm font-black text-white shadow">
-          Turning {activeMove}
+        <div className="pointer-events-none absolute right-4 top-4 z-10 rounded-xl border border-cyan-300/30 bg-cyan-300/15 px-4 py-2.5 text-sm font-black text-cyan-100 shadow-[0_0_28px_rgba(34,211,238,.2)] backdrop-blur-xl">
+          Executing {activeMove}
         </div>
       ) : null}
-      <Canvas shadows>
+      <div className="pointer-events-none absolute bottom-4 left-4 z-10 flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.2em] text-slate-600"><span className="h-px w-8 bg-slate-700" /> Digital twin viewport</div>
+      <Canvas
+        dpr={[1, 1.35]}
+        frameloop={activeMove ? "always" : "demand"}
+        gl={{ antialias: true, powerPreference: "high-performance" }}
+        shadows
+        fallback={<div className="flex h-full items-center justify-center text-sm text-slate-500">WebGL is unavailable. The solver remains fully usable.</div>}
+      >
         <PerspectiveCamera makeDefault position={[5.2, 4.1, 5.6]} fov={40} />
-        <ambientLight intensity={0.9} />
-        <directionalLight position={[3, 6, 4]} intensity={1.8} castShadow />
+        <ambientLight intensity={0.62} />
+        <directionalLight position={[3, 6, 4]} intensity={2.8} color="#dff9ff" castShadow />
+        <pointLight position={[-5, 1, 3]} intensity={18} distance={12} color="#22d3ee" />
+        <pointLight position={[4, -1, -3]} intensity={14} distance={12} color="#8b5cf6" />
         <AnimatedCube activeMove={activeMove} facelets={visualFacelets} />
+        <mesh position={[0, -2.08, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+          <planeGeometry args={[9, 9]} />
+          <shadowMaterial transparent opacity={0.28} />
+        </mesh>
         <OrbitControls enablePan={false} enableRotate={false} minDistance={5} maxDistance={9} enableDamping />
       </Canvas>
     </div>

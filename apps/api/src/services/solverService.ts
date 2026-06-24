@@ -1,12 +1,12 @@
 import { parseNotation, type SolveResult } from "@rubiks/shared";
-import { execFile } from "node:child_process";
-import { badRequest } from "../lib/http";
+import { Worker } from "node:worker_threads";
+import { badRequest, serviceUnavailable } from "../lib/http";
 
 const SOLVER_TIMEOUT_MS = 9000;
 
 function runCubeSolver(facelets: string): Promise<{ notation: string; facelets: string }> {
   const script = `
-const facelets = process.argv[1];
+const { parentPort, workerData: facelets } = require("node:worker_threads");
 function isPermutation(values, size) {
   if (!Array.isArray(values) || values.length !== size) return false;
   const seen = new Set(values);
@@ -77,27 +77,40 @@ try {
   if (verification.asString() !== solvedFacelets) {
     throw new Error("The generated moves did not verify against the exact scan. Rescan the cube before trying to solve it.");
   }
-  process.stdout.write(JSON.stringify({ notation, facelets }));
+  parentPort.postMessage({ notation, facelets });
 } catch (error) {
-  process.stdout.write(JSON.stringify({ error: error instanceof Error ? error.message : "Solver failed." }));
-  process.exitCode = 1;
+  parentPort.postMessage({ error: error instanceof Error ? error.message : "Solver failed." });
 }
 `;
 
   return new Promise((resolve, reject) => {
-    execFile(process.execPath, ["-e", script, facelets], { cwd: process.cwd(), timeout: SOLVER_TIMEOUT_MS }, (error, stdout) => {
-      if (error?.killed) {
-        reject(badRequest("Solver timed out. Check the scanned stickers or correct the cube manually."));
-        return;
-      }
+    const worker = new Worker(script, { eval: true, workerData: facelets });
+    let settled = false;
+    const timeoutId = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      void worker.terminate();
+      reject(badRequest("Solver timed out. Check the scanned stickers or correct the cube manually."));
+    }, SOLVER_TIMEOUT_MS);
 
-      try {
-        const payload = JSON.parse(stdout) as { notation?: string; facelets?: string; error?: string };
+    const finish = (callback: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
+      callback();
+    };
+
+    worker.once("message", (payload: { notation?: string; facelets?: string; error?: string }) => {
+      finish(() => {
         if (payload.error) reject(badRequest(payload.error));
         else resolve({ notation: payload.notation ?? "", facelets: payload.facelets ?? facelets });
-      } catch {
-        reject(error ?? badRequest("Solver returned an invalid response."));
-      }
+      });
+    });
+    worker.once("error", (error) => {
+      finish(() => reject(serviceUnavailable(`Solver worker failed to start: ${error.message}`)));
+    });
+    worker.once("exit", (code) => {
+      if (code !== 0) finish(() => reject(serviceUnavailable("Solver worker stopped before returning a result.")));
     });
   });
 }

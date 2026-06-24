@@ -1,15 +1,11 @@
-import { Pause, Play, RotateCcw, RotateCw, ShieldCheck, SkipBack, StepBack, StepForward } from "lucide-react";
+import { Gauge, Pause, Play, RotateCcw, RotateCw, ShieldCheck, SkipBack, StepBack, StepForward } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { MoveToken, SolveResult } from "@rubiks/shared";
 import { describeMove } from "../lib/moveInstructions";
 import { Button } from "./Button";
 import { MoveFaceDiagram } from "./MoveFaceDiagram";
 
-const playbackDelays: Record<string, number> = {
-  "0.5": 3200,
-  "1": 2100,
-  "1.5": 1400
-};
+const playbackDelays: Record<string, number> = { "0.5": 3200, "1": 2100, "1.5": 1400 };
 
 export function MoveControls({
   solution,
@@ -29,7 +25,7 @@ export function MoveControls({
   const [step, setStep] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState("1");
-  const moves = solution?.moves ?? [];
+  const moves = useMemo(() => solution?.moves ?? [], [solution?.moves]);
   const complete = moves.length > 0 && step >= moves.length;
   const nextMove = moves[step] ?? null;
   const shownMove = activeMove ?? nextMove ?? moves.at(-1) ?? null;
@@ -85,95 +81,83 @@ export function MoveControls({
   const progress = moves.length ? Math.min(100, (step / moves.length) * 100) : 0;
 
   return (
-    <div className="space-y-3">
-      <div className="rounded-lg border border-teal-200 bg-teal-50 p-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className="space-y-4">
+      <div className="overflow-hidden rounded-2xl border border-cyan-300/15 bg-gradient-to-br from-cyan-400/[0.07] via-slate-950/50 to-violet-500/[0.06]">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
           <div>
-            <div className="text-xs font-bold uppercase tracking-wide text-teal-800">Guided solution video</div>
-            <div className="mt-0.5 text-sm font-semibold text-teal-950">Keep white on top, green in front, and red on the right.</div>
-            {solution ? (
-              <div className="mt-1 flex items-center gap-1 text-xs font-semibold text-teal-800">
-                <ShieldCheck size={13} /> Verified against this exact {moves.length}-move scan. Move count varies by scramble.
-              </div>
-            ) : null}
+            <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-300">Guided solve protocol</div>
+            <div className="mt-1 text-xs font-medium text-slate-400">White up · Green forward · Red right</div>
           </div>
-          <label className="flex items-center gap-2 text-xs font-semibold text-teal-900">
-            Speed
-            <select className="h-9 rounded-md border border-teal-300 bg-white px-2" value={speed} onChange={(event) => setSpeed(event.target.value)}>
-              <option value="0.5">0.5×</option>
-              <option value="1">1×</option>
-              <option value="1.5">1.5×</option>
+          <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            <Gauge size={14} className="text-cyan-300" /> Speed
+            <select className="h-9 rounded-xl border border-white/10 bg-slate-950 px-2 text-xs text-white outline-none focus:border-cyan-300/40" value={speed} onChange={(event) => setSpeed(event.target.value)}>
+              <option value="0.5">0.5×</option><option value="1">1×</option><option value="1.5">1.5×</option>
             </select>
           </label>
         </div>
 
-        <div className="mt-3 h-2 overflow-hidden rounded-full bg-teal-100">
-          <div className="h-full rounded-full bg-teal-700 transition-[width] duration-300" style={{ width: `${progress}%` }} />
-        </div>
-        <div className="mt-1 flex justify-between text-xs text-teal-800">
-          <span>{moves.length ? `${step} of ${moves.length} moves completed` : "Generate a solution to begin"}</span>
-          <span>{Math.round(progress)}%</span>
-        </div>
+        <div className="p-4">
+          <div className="mb-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+            <span>{moves.length ? `${step} / ${moves.length} moves` : "Awaiting verified state"}</span>
+            <span className="text-cyan-300">{Math.round(progress)}%</span>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-slate-800">
+            <div className="h-full rounded-full bg-gradient-to-r from-cyan-300 via-blue-400 to-violet-500 shadow-[0_0_12px_rgba(34,211,238,.5)] transition-[width] duration-300" style={{ width: `${progress}%` }} />
+          </div>
 
-        {instruction && shownMove ? (
-          <div className="mt-3 grid grid-cols-[7rem_1fr] items-center gap-3 rounded-md border border-teal-200 bg-white p-3">
-            <MoveFaceDiagram move={shownMove} instruction={instruction} animating={Boolean(activeMove)} />
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 text-base font-black text-slate-900">
-                {instruction.direction === "counterclockwise" ? <RotateCcw size={20} className="text-teal-700" /> : <RotateCw size={20} className="text-teal-700" />}
-                {activeMove ? "Perform this move" : complete ? "Solution complete" : `Next move: ${shownMove}`}
+          {solution ? (
+            <div className="mt-3 flex items-center gap-1.5 text-[10px] font-semibold text-emerald-300"><ShieldCheck size={13} /> Verified against this exact {moves.length}-move state</div>
+          ) : null}
+
+          {instruction && shownMove ? (
+            <div className="mt-4 grid items-center gap-4 rounded-2xl border border-white/10 bg-black/25 p-4 sm:grid-cols-[7.5rem_1fr]">
+              <MoveFaceDiagram move={shownMove} instruction={instruction} animating={Boolean(activeMove)} />
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 text-lg font-black text-white">
+                  {instruction.direction === "counterclockwise" ? <RotateCcw size={20} className="text-cyan-300" /> : <RotateCw size={20} className="text-cyan-300" />}
+                  {activeMove ? "Execute this move" : complete ? "Sequence complete" : `Next · ${shownMove}`}
+                </div>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-200">{complete && !activeMove ? "The cube should now be solved." : instruction.instruction}</p>
+                {!complete || activeMove ? (
+                  <>
+                    <p className="mt-1 text-xs leading-5 text-slate-500">{instruction.viewpoint} Keep the cube's overall orientation fixed.</p>
+                    <p className="mt-3 rounded-xl border border-amber-300/15 bg-amber-400/[0.07] px-3 py-2 text-xs font-semibold text-amber-100">Turn only the {instruction.centerColor} layer. Do not rotate the entire cube.</p>
+                  </>
+                ) : null}
               </div>
-              <p className="mt-1 text-sm font-semibold text-slate-800">{complete && !activeMove ? "The cube should now be solved." : instruction.instruction}</p>
-              {!complete || activeMove ? (
-                <>
-                  <p className="mt-1 text-xs text-slate-500">{instruction.viewpoint} Keep the cube's overall orientation fixed.</p>
-                  <p className="mt-2 rounded bg-amber-50 px-2 py-1.5 text-xs font-bold text-amber-900">Turn only the {instruction.centerColor} layer. Do not rotate the entire cube.</p>
-                </>
-              ) : null}
             </div>
-          </div>
-        ) : (
-          <div className="mt-3 rounded-md border border-dashed border-teal-300 bg-white p-4 text-sm text-slate-600">
-            Scan the cube and generate a solution to create the walkthrough.
-          </div>
-        )}
+          ) : (
+            <div className="mt-4 rounded-2xl border border-dashed border-white/10 bg-black/20 p-5 text-center">
+              <div className="text-sm font-semibold text-slate-300">No movement sequence yet</div>
+              <div className="mt-1 text-xs text-slate-600">Complete the scan and generate a verified solution.</div>
+            </div>
+          )}
 
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Button icon={<SkipBack size={16} />} onClick={restart} disabled={!moves.length || (step === 0 && !playing)}>
-            Restart
-          </Button>
-          <Button icon={<StepBack size={16} />} onClick={previous} disabled={step === 0}>
-            Previous
-          </Button>
-          <Button icon={playing ? <Pause size={16} /> : <Play size={16} />} variant="primary" onClick={togglePlayback} disabled={!moves.length}>
-            {playing ? "Pause" : complete ? "Replay" : "Play instructions"}
-          </Button>
-          <Button icon={<StepForward size={16} />} onClick={performNext} disabled={!nextMove || playing}>
-            Next move
-          </Button>
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+            <Button icon={<SkipBack size={16} />} onClick={restart} disabled={!moves.length || (step === 0 && !playing)}>Restart</Button>
+            <Button icon={<StepBack size={16} />} onClick={previous} disabled={step === 0}>Previous</Button>
+            <Button className="col-span-2 sm:min-w-40" icon={playing ? <Pause size={16} /> : <Play size={16} />} variant="primary" onClick={togglePlayback} disabled={!moves.length}>
+              {playing ? "Pause" : complete ? "Replay" : "Play instructions"}
+            </Button>
+            <Button icon={<StepForward size={16} />} onClick={performNext} disabled={!nextMove || playing}>Next move</Button>
+          </div>
         </div>
       </div>
 
-      <div className="rounded-md border border-line bg-slate-50 p-3">
-        <div className="mb-2 flex items-center justify-between">
-          <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Solution timeline</span>
-          <span className="text-xs text-slate-500">{moveHistory.length} turns demonstrated</span>
+      <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">Solution timeline</span>
+          <span className="text-[10px] text-slate-600">{moveHistory.length} turns demonstrated</span>
         </div>
         <div className="flex min-h-10 flex-wrap gap-1.5">
           {moves.length ? moves.map((move, index) => (
             <span
               key={`${move}-${index}`}
-              className={`flex h-8 min-w-8 items-center justify-center rounded border px-1.5 text-xs font-bold ${
-                index < step
-                  ? "border-teal-300 bg-teal-100 text-teal-900"
-                  : index === step
-                    ? "border-amber-400 bg-amber-50 text-amber-900 ring-2 ring-amber-200"
-                    : "border-line bg-white text-slate-500"
-              }`}
+              className={`flex h-8 min-w-8 items-center justify-center rounded-lg border px-1.5 text-xs font-black transition ${index < step ? "border-emerald-300/20 bg-emerald-400/10 text-emerald-200" : index === step ? "border-cyan-300/40 bg-cyan-300/10 text-cyan-100 ring-2 ring-cyan-300/10" : "border-white/10 bg-white/[0.03] text-slate-600"}`}
             >
               {move}
             </span>
-          )) : <span className="text-sm text-slate-600">No solution generated</span>}
+          )) : <span className="text-xs text-slate-600">Sequence will appear here</span>}
         </div>
       </div>
     </div>
