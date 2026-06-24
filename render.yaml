@@ -3,7 +3,7 @@ services:
     name: cubevision-api-yenila
     runtime: node
     buildCommand: npm ci && npm run build:shared && npm run prisma:generate && npm run build:api
-    startCommand: npm run prisma:deploy && npm --workspace apps/api run start
+    startCommand: npm run prisma:deploy && node apps/api/dist/server.js
     healthCheckPath: /api/health
     envVars:
       - key: NODE_VERSION
