@@ -1,0 +1,3 @@
+-- Placeholder for the initial schema migration that already exists in the linked
+-- Supabase project's migration history. Keep this file so `supabase db push`
+-- can reconcile local and remote migration versions.
