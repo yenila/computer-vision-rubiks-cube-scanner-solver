@@ -33,16 +33,7 @@ const CubeViewer = lazy(async () => {
 export function App() {
   const [scan, setScan] = useState<CubeScanState>(() => createEmptyScanState());
   const [activeFace, setActiveFace] = useState<CubeFace>("F");
-  const [session, setSession] = useState<ApiSession | null>(() => {
-    const raw = localStorage.getItem("rubiks-session");
-    if (!raw) return null;
-    try {
-      return JSON.parse(raw) as ApiSession;
-    } catch {
-      localStorage.removeItem("rubiks-session");
-      return null;
-    }
-  });
+  const [session, setSession] = useState<ApiSession | null>(null);
   const [hasEnteredApp, setHasEnteredApp] = useState(false);
   const [solution, setSolution] = useState<SolveResult | null>(null);
   const [moveHistory, setMoveHistory] = useState<MoveToken[]>([]);
@@ -70,9 +61,24 @@ export function App() {
   ];
 
   useEffect(() => {
-    if (session) localStorage.setItem("rubiks-session", JSON.stringify(session));
-    else localStorage.removeItem("rubiks-session");
-  }, [session]);
+    let cancelled = false;
+    api.getSession()
+      .then((storedSession) => {
+        if (cancelled || !storedSession) return;
+        setSession(storedSession);
+        setHasEnteredApp(true);
+      })
+      .catch(() => undefined);
+    const unsubscribe = api.onAuthStateChange((nextSession) => {
+      if (cancelled) return;
+      setSession(nextSession);
+      if (nextSession) setHasEnteredApp(true);
+    });
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, []);
 
   const updateFaceScan = (faceScan: FaceScan) => {
     setScan((current) => ({ ...current, [faceScan.face]: faceScan }));
@@ -117,8 +123,8 @@ export function App() {
       return;
     }
     try {
-      const saved = await api.createScan(session.token, { name: `Scan ${new Date().toLocaleString()}`, scan, solution: solution ?? undefined });
-      if (solution) await api.createSolve(session.token, { scanId: saved.id, solution, durationMs: Math.max(1000, solution.moves.length * 850) });
+      const saved = await api.createScan(undefined, { name: `Scan ${new Date().toLocaleString()}`, scan, solution: solution ?? undefined });
+      if (solution) await api.createSolve(undefined, { scanId: saved.id, solution, durationMs: Math.max(1000, solution.moves.length * 850) });
       setMessage("Scan saved.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Save failed.");

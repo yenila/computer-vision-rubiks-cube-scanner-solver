@@ -1,4 +1,4 @@
-import type { AuthUser, CubeScanState, SolveResult } from "@rubiks/shared";
+import { type AuthUser, type CubeScanState, type SolveResult } from "@rubiks/shared";
 export type ApiSession = {
     token: string;
     user: AuthUser;
@@ -25,6 +25,11 @@ export type LeaderboardEntry = {
     solves: number;
 };
 export declare const api: {
+    getSession: () => Promise<{
+        token: string;
+        user: AuthUser;
+    } | null>;
+    onAuthStateChange: (callback: (session: ApiSession | null) => void) => () => void;
     register: (input: {
         email: string;
         password: string;
@@ -34,18 +39,25 @@ export declare const api: {
         email: string;
         password: string;
     }) => Promise<ApiSession>;
+    logout: () => Promise<void>;
     solve: (facelets: string) => Promise<SolveResult>;
-    listScans: (token: string) => Promise<ScanRecord[]>;
-    createScan: (token: string, input: {
+    listScans: (_token?: string) => Promise<ScanRecord[]>;
+    createScan: (_token: string | undefined, input: {
         name: string;
         scan: CubeScanState;
         solution?: SolveResult;
     }) => Promise<ScanRecord>;
-    listSolves: (token: string) => Promise<SolveRecord[]>;
-    createSolve: (token: string, input: {
+    listSolves: (_token?: string) => Promise<SolveRecord[]>;
+    createSolve: (_token: string | undefined, input: {
         scanId?: string;
         solution: SolveResult;
         durationMs: number;
     }) => Promise<SolveRecord>;
-    leaderboard: () => Promise<LeaderboardEntry[]>;
+    leaderboard: () => Promise<{
+        id: string;
+        rank: number;
+        name: string;
+        bestTimeMs: number;
+        solves: number;
+    }[]>;
 };

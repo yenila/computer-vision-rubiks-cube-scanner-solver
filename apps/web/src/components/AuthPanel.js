@@ -25,7 +25,21 @@ export function AuthPanel({ session, onSession }) {
         }
     };
     if (session) {
-        return (_jsxs("div", { className: "space-y-4", children: [_jsxs("div", { className: "flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-3", children: [_jsx("div", { className: "flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-300 to-violet-500 text-sm font-black text-slate-950", children: session.user.name.slice(0, 2).toUpperCase() }), _jsxs("div", { className: "min-w-0", children: [_jsx("div", { className: "truncate text-sm font-semibold text-white", children: session.user.name }), _jsx("div", { className: "truncate text-xs text-slate-400", children: session.user.email })] })] }), _jsx(Button, { icon: _jsx(LogOut, { size: 16 }), onClick: () => onSession(null), children: "Sign out" })] }));
+        const signOut = async () => {
+            setLoading(true);
+            setError(null);
+            try {
+                await api.logout();
+                onSession(null);
+            }
+            catch (authError) {
+                setError(authError instanceof Error ? authError.message : "Sign out failed.");
+            }
+            finally {
+                setLoading(false);
+            }
+        };
+        return (_jsxs("div", { className: "space-y-4", children: [_jsxs("div", { className: "flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-3", children: [_jsx("div", { className: "flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-300 to-violet-500 text-sm font-black text-slate-950", children: session.user.name.slice(0, 2).toUpperCase() }), _jsxs("div", { className: "min-w-0", children: [_jsx("div", { className: "truncate text-sm font-semibold text-white", children: session.user.name }), _jsx("div", { className: "truncate text-xs text-slate-400", children: session.user.email })] })] }), error ? _jsx("div", { className: "rounded-xl border border-red-400/20 bg-red-500/10 px-3 py-2 text-sm text-red-200", children: error }) : null, _jsx(Button, { icon: _jsx(LogOut, { size: 16 }), onClick: () => void signOut(), disabled: loading, children: loading ? "Signing out" : "Sign out" })] }));
     }
     return (_jsxs("form", { className: "space-y-3", onSubmit: (event) => {
             event.preventDefault();

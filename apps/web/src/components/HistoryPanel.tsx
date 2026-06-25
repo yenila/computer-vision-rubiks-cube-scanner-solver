@@ -20,7 +20,7 @@ export function HistoryPanel({ session }: { session: ApiSession | null }) {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    Promise.all([api.listScans(session.token), api.listSolves(session.token)])
+    Promise.all([api.listScans(), api.listSolves()])
       .then(([nextScans, nextSolves]) => {
         if (cancelled) return;
         setScans(nextScans);

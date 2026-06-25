@@ -4,6 +4,8 @@ coverage
 .env
 .env.local
 .env.*.local
+.vercel
+supabase/.temp
 *.log
 .DS_Store
 apps/api/prisma/dev.db

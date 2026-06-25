@@ -1,63 +1,91 @@
-# Computer Vision Rubik’s Cube Scanner and Solver
+# Computer Vision Rubik's Cube Scanner and Solver
 
-A full-stack Rubik's Cube scanner web app with camera-guided scanning, OpenCV-assisted sticker detection, color classification, cube-state validation, cubejs solving, metallic React Three Fiber visualization, JWT authentication, saved scan history, personal stats, and a global leaderboard.
+A Supabase-powered Rubik's Cube scanner web app with camera-guided scanning, OpenCV-assisted sticker detection, color classification, cube-state validation, client-side cube solving, metallic React Three Fiber visualization, Supabase Auth, saved scan history, personal stats, and a global leaderboard.
 
 ## Architecture
 
 This repository is an npm-workspaces monorepo:
 
-- `apps/web`: React 19, TypeScript, Vite, Tailwind CSS, React Three Fiber, OpenCV.js loader, camera workflow, manual correction, solver controls, auth, history, leaderboard, and responsive UI.
-- `apps/api`: Node.js, Express, TypeScript, Prisma, PostgreSQL, JWT auth, route validation, service/repository layers, and centralized error handling.
-- `packages/shared`: cube domain model, color classification, facelet validation, solver notation helpers, and shared DTO types used by both frontend and backend.
+- `apps/web`: React 19, TypeScript, Vite, Tailwind CSS, React Three Fiber, OpenCV.js loader, camera workflow, manual correction, client-side solver controls, Supabase Auth, scan history, leaderboard, and responsive UI.
+- `packages/shared`: cube domain model, color classification, facelet validation, solver notation helpers, and shared DTO types.
+- `supabase/migrations`: hosted Supabase PostgreSQL schema, indexes, triggers, and row-level security policies.
+- `apps/api`: legacy Express/Prisma API kept in the repo, but the public Vercel deployment no longer depends on it.
 
-The shared package keeps cube rules outside the UI and API framework code. The backend follows clean architecture boundaries: routes call services, services call repositories, and infrastructure details stay behind Prisma and middleware adapters.
+The deployed app is a static Vite frontend on Vercel. Authentication and persistence go directly to Supabase through `@supabase/supabase-js`; solving runs in the browser through `cubejs`.
 
 ## Requirements
 
 - Node.js 20.18+
 - npm 10+
-- Docker Desktop for local PostgreSQL, or your own PostgreSQL instance
+- A Supabase project
+- Vercel project linked to this repository
 
-## Setup
+## Supabase Setup
+
+Apply the schema in `supabase/migrations/20260625000000_supabase_app_schema.sql` to your Supabase project.
+
+You can apply it with the Supabase CLI:
+
+```bash
+supabase link --project-ref your-project-ref
+supabase db push
+```
+
+Or paste the SQL file into the Supabase SQL Editor and run it.
+
+The migration creates:
+
+- `profiles`
+- `cube_scans`
+- `solve_history`
+- `leaderboard_entries`
+
+It also enables row-level security so users can only read/write their own scans and solve history, while the leaderboard is publicly readable.
+
+## Environment
+
+Create `.env` locally:
+
+```bash
+VITE_SUPABASE_URL="https://your-project-ref.supabase.co"
+VITE_SUPABASE_ANON_KEY="your-supabase-anon-key"
+VITE_OPENCV_URL="https://docs.opencv.org/4.x/opencv.js"
+```
+
+Use the same values in Vercel Project Settings -> Environment Variables.
+
+## Local Development
 
 ```bash
 npm install
-cp .env.example .env
-docker compose up -d postgres
-npm run prisma:generate
-npm run prisma:migrate
-npm run seed
-npm run dev
+npm run dev:web
 ```
 
 Web: `http://localhost:5173`
 
-API: `http://localhost:4000/api`
+The deployed frontend does not require the local Express API. Supabase Auth and database calls go to your configured Supabase project.
 
-## Environment
+## Deploy to Vercel
 
-Root `.env` values are consumed by the API and Vite:
+1. Push the repository to GitHub.
+2. Import the repository in Vercel.
+3. Add the environment variables:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+   - `VITE_OPENCV_URL`
+4. Keep the included `vercel.json`.
+5. Deploy.
+
+Vercel uses:
 
 ```bash
-DATABASE_URL="postgresql://rubiks:rubiks@localhost:5432/rubiks_scanner?schema=public"
-JWT_SECRET="replace-with-a-long-random-secret"
-JWT_EXPIRES_IN="7d"
-CORS_ORIGIN="http://localhost:5173"
-PORT="4000"
-VITE_API_URL="http://localhost:4000/api"
-VITE_OPENCV_URL="https://docs.opencv.org/4.x/opencv.js"
+npm run build:web
 ```
 
-For production, use a strong `JWT_SECRET`, HTTPS, managed PostgreSQL, a pinned OpenCV.js asset, and a restricted `CORS_ORIGIN`.
-
-## Scripts
+Output directory:
 
 ```bash
-npm run dev
-npm run build
-npm run test
-npm run prisma:migrate
-npm run seed
+apps/web/dist
 ```
 
 ## Scanner Flow
@@ -65,47 +93,18 @@ npm run seed
 1. The browser requests the rear camera through `getUserMedia`; captured pixels are kept unmirrored.
 2. A guided workflow identifies faces by center color in the order green, red, blue, orange, white, and yellow.
 3. The user keeps white on top while rotating through the side faces. Every camera step shows the required top-edge color; the white face uses blue on top, and the yellow face uses green on top.
-4. Captured center RGB values calibrate the remaining scans for the current camera and lighting. If the camera still disagrees with the expected center, the user can explicitly confirm the physical center color instead of being blocked.
+4. Captured center RGB values calibrate the remaining scans for the current camera and lighting.
 5. OpenCV.js is loaded lazily and attempts contour detection for a 3x3 sticker grid.
 6. If OpenCV is unavailable or the image is low quality, the detector falls back to a calibrated 3x3 center crop.
 7. Sticker colors are classified in LAB-like RGB distance space against configurable cube color centroids.
 8. The user can correct any sticker before validation and review the final cube net.
 9. The shared validator checks six faces, nine stickers per face, center uniqueness, and exact color counts.
-10. The solver rejects ambiguous face orientation instead of silently rotating scanned faces, then verifies that its generated moves solve the exact submitted state before returning them.
-11. A guided solution player explains every move by center color, shows a head-on clockwise/counterclockwise face diagram, and supports play, pause, previous, next, replay, and slower playback speeds. Solution length varies with the scramble; it is not fixed at 21 moves.
-12. The locked-view 3D cube starts from the exact scanned state, animates each physical layer turn, and preserves the resulting sticker state for the next instruction.
-
-## API
-
-- `POST /api/auth/register`
-- `POST /api/auth/login`
-- `GET /api/me`
-- `POST /api/scans`
-- `GET /api/scans`
-- `GET /api/scans/:id`
-- `POST /api/solves`
-- `GET /api/solves`
-- `GET /api/leaderboard`
-- `POST /api/leaderboard`
-
-Authenticated endpoints require:
-
-```http
-Authorization: Bearer <token>
-```
-
-## Docker
-
-```bash
-docker compose up --build
-```
-
-The frontend is served on `http://localhost:8080`, API on `http://localhost:4000`, and PostgreSQL on `localhost:5432`.
+10. The browser solver rejects ambiguous face orientation and verifies generated moves against the exact submitted state.
+11. A guided solution player explains every move and supports play, pause, previous, next, replay, and slower playback speeds.
+12. Signed-in users can save scans, solve history, and leaderboard entries to Supabase.
 
 ## Testing
 
-Critical domain logic is covered in `packages/shared`. Frontend tests cover cube correction behavior. API tests cover auth and route error handling with mocked services.
-
 ```bash
-npm run test
+npm run test:web
 ```

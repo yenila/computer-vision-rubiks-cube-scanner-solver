@@ -26,6 +26,19 @@ export function AuthPanel({ session, onSession }: { session: ApiSession | null; 
   };
 
   if (session) {
+    const signOut = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        await api.logout();
+        onSession(null);
+      } catch (authError) {
+        setError(authError instanceof Error ? authError.message : "Sign out failed.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-3">
@@ -37,8 +50,9 @@ export function AuthPanel({ session, onSession }: { session: ApiSession | null; 
             <div className="truncate text-xs text-slate-400">{session.user.email}</div>
           </div>
         </div>
-        <Button icon={<LogOut size={16} />} onClick={() => onSession(null)}>
-          Sign out
+        {error ? <div className="rounded-xl border border-red-400/20 bg-red-500/10 px-3 py-2 text-sm text-red-200">{error}</div> : null}
+        <Button icon={<LogOut size={16} />} onClick={() => void signOut()} disabled={loading}>
+          {loading ? "Signing out" : "Sign out"}
         </Button>
       </div>
     );

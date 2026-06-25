@@ -8,6 +8,8 @@ vi.mock("./lib/api", async (importOriginal) => {
     ...actual,
     api: {
       ...actual.api,
+      getSession: () => Promise.resolve(null),
+      onAuthStateChange: () => () => undefined,
       leaderboard: () => new Promise(() => undefined)
     }
   };
@@ -16,12 +18,7 @@ vi.mock("./lib/api", async (importOriginal) => {
 describe("App entry flow", () => {
   beforeEach(() => localStorage.clear());
 
-  it("always starts at the login and guest gateway, even with a stored session", () => {
-    localStorage.setItem("rubiks-session", JSON.stringify({
-      token: "stored-token",
-      user: { id: "user-1", name: "Stored User", email: "stored@example.com" }
-    }));
-
+  it("starts at the login and guest gateway before entering guest mode", () => {
     render(<App />);
 
     expect(screen.getByRole("heading", { name: "Enter CubeVision" })).toBeInTheDocument();
